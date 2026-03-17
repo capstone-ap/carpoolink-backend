@@ -1,0 +1,27 @@
+{
+  "name": "carpoolink",
+  "version": "1.0.0",
+  "description": "Carpoolink modular mentoring platform workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "npm run start -w services/mentoring-session",
+    "dev": "npm run dev -w services/mentoring-session",
+    "dev:mentoring": "npm run dev -w services/mentoring-session",
+    "dev:sfu": "npm run dev -w services/sfu-server",
+    "dev:audio-router": "npm run dev -w services/audio-router",
+    "dev:live-chat": "npm run dev -w services/live-chat",
+    "dev:question-queue": "npm run dev -w services/question-queue",
+    "dev:voice-command": "npm run dev -w services/voice-command",
+    "dev:drm-guard": "npm run dev -w services/drm-guard",
+    "test": "npm run test -ws --if-present"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

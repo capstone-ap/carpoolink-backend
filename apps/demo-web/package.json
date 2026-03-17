@@ -1,0 +1,11 @@
+{
+    "name": "@carpoolink/demo-web",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "echo \"demo-web scaffold pending\"",
+        "build": "echo \"demo-web scaffold pending\"",
+        "start": "echo \"demo-web scaffold pending\""
+    }
+}

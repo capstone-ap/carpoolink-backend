@@ -1,0 +1,18 @@
+{
+    "name": "@carpoolink/question-queue",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "main": "src/server.js",
+    "scripts": {
+        "start": "node src/server.js",
+        "dev": "nodemon src/server.js"
+    },
+    "dependencies": {
+        "express": "^5.2.1",
+        "redis": "^5.8.2"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.14"
+    }
+}
