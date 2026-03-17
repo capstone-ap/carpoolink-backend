@@ -2,5 +2,11 @@
     "name": "@carpoolink/common",
     "version": "0.1.0",
     "private": true,
-    "type": "module"
+    "type": "module",
+    "exports": {
+        "./database": "./src/database.js"
+    },
+    "dependencies": {
+        "pg": "^8.11.0"
+    }
 }

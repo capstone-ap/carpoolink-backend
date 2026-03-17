@@ -7,8 +7,3 @@
 ```bash
 npm run dev -w services/mentoring-session
 ```
-
-## API (초안)
-
-- `POST /api/mentoring/voice/switch`
-- `POST /api/mentoring/voice/answer-visibility`
