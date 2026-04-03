@@ -12,7 +12,7 @@
   "scripts": {
     "start": "npm run start -w services/mentoring-session",
     "db:init": "node scripts/db-init.js",
-    "dev": "npm run db:init && npm run dev:mentoring",
+    "dev": "npm run npm run dev:mentoring",
     "dev:mentoring": "npm run dev -w services/mentoring-session",
     "dev:sfu": "npm run dev -w services/sfu-server",
     "dev:audio-router": "npm run dev -w services/audio-router",
