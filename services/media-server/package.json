@@ -1,5 +1,5 @@
 {
-    "name": "@carpoolink/sfu-server",
+    "name": "@carpoolink/media-server",
     "version": "0.1.0",
     "private": true,
     "type": "module",

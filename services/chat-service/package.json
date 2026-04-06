@@ -1,5 +1,5 @@
 {
-    "name": "@carpoolink/drm-guard",
+    "name": "@carpoolink/chat-service",
     "version": "0.1.0",
     "private": true,
     "type": "module",
@@ -9,7 +9,9 @@
         "dev": "nodemon src/server.js"
     },
     "dependencies": {
-        "express": "^5.2.1"
+        "express": "^5.2.1",
+        "socket.io": "^4.8.1",
+        "redis": "^5.8.2"
     },
     "devDependencies": {
         "nodemon": "^3.1.14"

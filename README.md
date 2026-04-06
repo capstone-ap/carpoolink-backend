@@ -52,9 +52,3 @@ tests/
     npm run dev:live-chat
     npm run dev:question-queue
     ```
-
-## 문서
-
-- API 스펙 초안: `docs/api/openapi.yaml`
-- 서비스별 실행 가이드: 각 서비스 폴더의 `README.md`
-- 공통 인터페이스: `packages/contracts`

@@ -13,16 +13,14 @@
     "seed": "node packages/database/prisma/seed.js"
   },
   "scripts": {
-    "start": "npm run start -w services/mentoring-session",
+    "start": "npm run start -w services/core-api",
     "db:setup": "npm install && npx prisma generate --schema=./packages/database/prisma/schema.prisma && npx prisma db push --schema=./packages/database/prisma/schema.prisma && npx prisma db seed --schema=./packages/database/prisma/schema.prisma",
-    "dev": "npm run dev:mentoring",
-    "dev:mentoring": "npm run dev -w services/mentoring-session",
-    "dev:sfu": "npm run dev -w services/sfu-server",
-    "dev:audio-router": "npm run dev -w services/audio-router",
-    "dev:live-chat": "npm run dev -w services/live-chat",
-    "dev:question-queue": "npm run dev -w services/question-queue",
-    "dev:voice-command": "npm run dev -w services/voice-command",
-    "dev:drm-guard": "npm run dev -w services/drm-guard",
+    "dev": "npm run dev:core",
+    "dev:core": "npm run dev -w services/core-api",
+    "dev:media": "npm run dev -w services/media-server",
+    "dev:chat": "npm run dev -w services/chat-service",
+    "dev:question": "npm run dev -w services/question-service",
+    "dev:stt": "npm run dev -w services/stt-service",
     "test": "npm run test -ws --if-present"
   },
   "keywords": [],
