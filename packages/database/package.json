@@ -1,0 +1,15 @@
+{
+    "name": "@carpoolink/database",
+    "version": "0.1.0",
+    "type": "module",
+    "main": "./src/index.js",
+    "exports": {
+        ".": "./src/index.js"
+    },
+    "dependencies": {
+        "@prisma/client": "^5.x.x"
+    },
+    "devDependencies": {
+        "prisma": "^5.x.x"
+    }
+}

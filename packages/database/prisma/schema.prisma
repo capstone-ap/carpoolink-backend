@@ -1,0 +1,216 @@
+// 기본 설정
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+// Enums
+
+enum UserRole {
+  MENTOR
+  MENTEE
+}
+
+enum FieldName {
+  WORK      // 업무
+  LIFE      // 일상
+  REWARD    // 보상
+  GROWTH    // 성장
+  CAREER    // 커리어
+  INDUSTRY  // 업계
+  MENTAL    // 멘탈
+  ACTUAL    // 실전
+  ETC       // 기타
+}
+
+enum QuestionStatus {
+  BEFORE
+  ANSWERING
+  COMPLETED
+}
+
+enum MentoringStatus {
+  READY
+  ON_AIR
+  COMPLETED
+}
+
+// 2. 모델 정의
+
+// 사용자 테이블
+model User {
+  userId    BigInt   @id @default(autoincrement()) @map("user_id")
+  email     String   @unique @db.VarChar(100)
+  nickname  String   @unique @db.VarChar(50)
+  role      UserRole @map("role")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // 관계 설정
+  mentorProfile      Mentor?
+  menteeProfile      Mentee?
+  mentoringHistories MentoringHistory[]
+  hostedMentorings   Mentoring[]        @relation("HostedMentorings")
+  askedQuestions     Question[]
+  scripts            Script[]
+  chats              MentoringChat[]
+
+  @@map("users")
+}
+
+// 멘토 프로필
+model Mentor {
+  mentorId  BigInt   @id @default(autoincrement()) @map("mentor_id")
+  bio       String?  @db.Text
+  info      Json     // 멘토 정보, 세부 분야, 지역 등
+  price     Int
+  updatedAt DateTime @updatedAt @map("updated_at")
+  userId    BigInt   @unique @map("user_id")
+
+  // 관계 설정
+  user User @relation(fields: [userId], references: [userId])
+  MentorField MentorField[]
+
+  @@map("mentors")
+}
+
+// 멘티 프로필
+model Mentee {
+  menteeId   BigInt   @id @default(autoincrement()) @map("mentee_id")
+  balance    Int      @default(0)
+  surveyData Json?    @map("survey_data")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  userId     BigInt   @unique @map("user_id")
+
+  // 관계 설정
+  user User @relation(fields: [userId], references: [userId])
+
+  @@map("mentees")
+}
+
+// 멘티의 멘토링 참여 이력
+model MentoringHistory {
+  mentoringHistoryId BigInt   @id @default(autoincrement()) @map("mentoring_history_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  userId             BigInt   @map("user_id")
+  mentoringId        BigInt   @map("mentoring_id")
+
+  // 관계 설정
+  user      User      @relation(fields: [userId], references: [userId])
+  mentoring Mentoring @relation(fields: [mentoringId], references: [mentoringId])
+
+  @@map("mentoring_histories")
+}
+
+// 멘토링 분야
+model Field {
+  fieldId   BigInt      @id @default(autoincrement()) @map("field_id")
+  fieldName FieldName   @unique @map("field_name")
+
+  // 관계 설정
+  mentors MentorField[]
+
+  @@map("fields")
+}
+
+// 멘토-분야 중간 테이블
+model MentorField {
+  mentorId  BigInt @map("mentor_id")
+  fieldId   BigInt @map("field_id")
+
+  // 관계 설정
+  mentor  Mentor  @relation(fields: [mentorId], references: [mentorId])
+  field   Field @relation(fields: [fieldId], references: [fieldId])
+
+  @@id([mentorId, fieldId])
+  @@map("mentor_field")
+}
+
+// 온라인 멘토링 세션
+model Mentoring {
+  mentoringId BigInt          @id @default(autoincrement()) @map("mentoring_id")
+  title       String          @db.VarChar(200)
+  isGroup     Boolean         @map("is_group")
+  status      MentoringStatus @default(READY) @map("status")
+  startedAt   DateTime?       @map("started_at")
+  endedAt     DateTime?       @map("ended_at")
+  userId      BigInt          @map("user_id") // 주관 멘토
+
+  // 관계 설정
+  hostMentor         User               @relation("HostedMentorings", fields: [userId], references: [userId])
+  participants       MentoringHistory[]
+  questions          Question[]
+  scripts            Script[]
+  chats              MentoringChat[]
+  aiRecommendations  AiRecommendation[]
+
+  @@map("mentorings")
+}
+
+// 질문
+model Question {
+  questionId    BigInt          @id @default(autoincrement()) @map("question_id")
+  content       String          @db.VarChar(200)
+  isPaid        Boolean         @map("is_paid")
+  isPrivate     Boolean         @map("is_private")
+  priorityScore Float           @default(0) @map("priority_score")
+  status        QuestionStatus  @default(BEFORE) @map("status")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  userId        BigInt          @map("user_id")
+  mentoringId   BigInt          @map("mentoring_id")
+
+  // 관계 설정
+  user      User      @relation(fields: [userId], references: [userId])
+  mentoring Mentoring @relation(fields: [mentoringId], references: [mentoringId])
+
+  @@map("questions")
+}
+
+// 스크립트
+model Script {
+  scriptId    BigInt   @id @default(autoincrement()) @map("script_id")
+  content     Json
+  isPrivate   Boolean  @map("is_private")
+  createdAt   DateTime @default(now()) @map("created_at")
+  userId      BigInt   @map("user_id")
+  mentoringId BigInt   @map("mentoring_id")
+
+  // 관계 설정
+  user      User      @relation(fields: [userId], references: [userId])
+  mentoring Mentoring @relation(fields: [mentoringId], references: [mentoringId])
+
+  @@map("scripts")
+}
+
+// 채팅
+model MentoringChat {
+  mentoringChatId BigInt   @id @default(autoincrement()) @map("mentoring_chat_id")
+  content         String   @db.VarChar(200)
+  createdAt       DateTime @default(now()) @map("created_at")
+  userId          BigInt   @map("user_id")
+  mentoringId     BigInt   @map("mentoring_id")
+
+  // 관계 설정
+  user      User      @relation(fields: [userId], references: [userId])
+  mentoring Mentoring @relation(fields: [mentoringId], references: [mentoringId])
+
+  @@map("mentoring_chat")
+}
+
+// AI 추천 질문
+model AiRecommendation {
+  aiRecommendationId BigInt   @id @default(autoincrement()) @map("ai_recommendation_id")
+  content            String   @db.VarChar(150)
+  createdAt          DateTime @default(now()) @map("created_at")
+  mentoringId        BigInt   @map("mentoring_id")
+
+  // 관계 설정
+  mentoring Mentoring @relation(fields: [mentoringId], references: [mentoringId])
+
+  @@map("ai_recommendations")
+}
