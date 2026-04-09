@@ -6,11 +6,12 @@ export default function SurveyResultPage() {
     // layout.tsx에서 이미 크기를 잡았으므로, 여기서는 w-full h-full로 부모 틀에 꽉 채웁니다.
     <main className="flex flex-col w-full h-full bg-[#F8F9FA] relative font-sans">
       
-      {/* 상단 네비게이션 (높이 고정: shrink-0) */}
-      <header className="w-full bg-white px-4 py-4 flex items-center shrink-0">
+      {/* 상단 네비게이션 */}
+      <header className="w-full bg-white px-4 py-4 flex items-center">
+        {/* 이전 화면(/survey)으로 돌아가는 링크 */}
         <Link href="/survey/step4" className="inline-flex items-center hover:opacity-80 transition-opacity">
           <img src="/icons/arrow.svg" alt="화살표 아이콘" className="w-5 h-5 mr-2 text-[#FFCC00]" />
-          <span className="text-[#2F2F2F] font-medium text-[16px]">이전</span>
+          <span className="text-[#2F2F2F] font-medium text-lg">이전</span>
         </Link>
       </header>
 
