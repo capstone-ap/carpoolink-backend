@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronLeft, Zap, Heart } from "lucide-react";
@@ -16,9 +15,9 @@ export default function SurveyStep3Page() {
         }, 50);
         return () => clearTimeout(timer);
     }, []);
-    
+
   return (
-    <main className="flex flex-col min-h-screen bg-[#F8F9FA] mx-auto max-w-md relative font-sans">
+    <main className="flex flex-col w-full h-full bg-[#F8F9FA] relative font-sans">
       
       {/* 상단 네비게이션 */}
       <header className="w-full bg-white px-4 py-4 flex items-center">
@@ -30,7 +29,7 @@ export default function SurveyStep3Page() {
       </header>
 
       {/* 본문 컨텐츠 영역 */}
-      <div className="flex flex-col flex-1 px-6 pt-12 pb-8">
+      <div className="flex flex-col flex-1 px-6 pt-18 pb-8">
         
         {/* 질문 타이틀 */}
         <h1 className="text-2xl sm:text-[28px] font-bold text-[#1A1A1A] text-center mb-10 tracking-tight">
@@ -68,9 +67,7 @@ export default function SurveyStep3Page() {
                     <div className="flex flex-col pt-1">
                     <h2 className="text-xl font-bold text-[#1A1A1A] mb-2">페이스메이커형</h2>
                     <p className="text-[#666666] text-[15px] leading-relaxed break-keep">
-                        꾸준히 할 수 있도록<br />
-                        옆에서 격려해주고,<br />
-                        심리적인 지지를 중시해요.
+                        꾸준히 할 수 있도록 옆에서 격려해주고, 심리적인 지지를 중시해요.
                     </p>
                     </div>
                 </button>

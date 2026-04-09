@@ -17,7 +17,7 @@ export default function SurveyStep2Page() {
     }, []);
 
   return (
-    <main className="flex flex-col min-h-screen bg-[#F8F9FA] mx-auto max-w-md relative font-sans">
+    <main className="flex flex-col w-full h-full bg-[#F8F9FA] relative font-sans">
       
       {/* 상단 네비게이션 */}
       <header className="w-full bg-white px-4 py-4 flex items-center">
@@ -29,7 +29,7 @@ export default function SurveyStep2Page() {
       </header>
 
       {/* 본문 컨텐츠 영역 */}
-      <div className="flex flex-col flex-1 px-6 pt-12 pb-8">
+      <div className="flex flex-col flex-1 px-6 pt-18 pb-8">
         
         {/* 질문 타이틀 */}
         <h1 className="text-2xl sm:text-[28px] font-bold text-[#1A1A1A] text-center mb-10 tracking-tight">
@@ -48,9 +48,7 @@ export default function SurveyStep2Page() {
                     <div className="flex flex-col pt-1">
                     <h2 className="text-xl font-bold text-[#1A1A1A] mb-2">질문 폭격기형</h2>
                     <p className="text-[#666666] text-[15px] leading-relaxed break-keep">
-                        스스로 공부하다가 막히는<br />
-                        부분을 조목조목 질문하고<br />
-                        답을 얻는 방식을 선호해요.
+                        스스로 공부하다가 막히는 부분을 조목조목 질문하고 답을 얻는 방식을 선호해요.
                     </p>
                     </div>
                 </button>
@@ -66,9 +64,7 @@ export default function SurveyStep2Page() {
                     <div className="flex flex-col pt-1">
                     <h2 className="text-xl font-bold text-[#1A1A1A] mb-2">자율 주도형</h2>
                     <p className="text-[#666666] text-[15px] leading-relaxed break-keep">
-                        큰 방향성만 제시해주면 스스로<br />
-                        파고드는 것을 좋아하며, 멘토를<br />
-                        '가이드'로 활용하고 싶어요.
+                        큰 방향성만 제시해주면 스스로 파고드는 것을 좋아하며, 멘토를 '가이드'로 활용하고 싶어요.
                     </p>
                     </div>
                 </button>

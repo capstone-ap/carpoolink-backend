@@ -4,7 +4,7 @@ import { ChevronLeft, BrainCircuit, Gauge, Waypoints, ArrowRight } from "lucide-
 export default function SurveyIntroPage() {
   return (
     // 배경색은 옅은 회색(#F8F9FA)으로 깔아줍니다.
-    <main className="flex flex-col min-h-screen bg-[#F8F9FA] mx-auto max-w-md relative font-sans">
+    <main className="flex flex-col w-full h-full bg-[#F8F9FA] relative font-sans">
       
       {/* 상단 네비게이션 (하얀색 바탕 박스) */}
       <header className="w-full bg-white px-4 py-4 flex items-center">
@@ -24,7 +24,7 @@ export default function SurveyIntroPage() {
           
           {/* 노란색 메인 박스 */}
           <div className="absolute inset-8 bg-[#FFCC00] rounded-[24px] shadow-md transform -rotate-6 flex items-center justify-center ">
-            <img src="/icons/brain.svg" alt="멘토링 설문 아이콘" className="w-16 h-16 text-[#1A1A1A]" />
+            <img src="/icons/brain.svg" alt="멘토링 설문 아이콘" className="w-16 h-16 transform rotate-12 text-[#1A1A1A]" />
           </div>
 
           {/* 우측 상단 검은색 미니 박스 */}
@@ -57,7 +57,7 @@ export default function SurveyIntroPage() {
             <div className="w-2 h-full bg-[#FFCC00] rounded-full"></div>
           </div>
           
-          <span className="text-xs font-medium tracking-widest text-gray-500 mb-6">
+          <span className="text-xs font-medium tracking-widest text-gray-500 mb-10">
             READY TO START
           </span>
 

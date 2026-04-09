@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ChevronLeft, Terminal, Globe } from "lucide-react";
+import { ChevronLeft, Terminal, Map } from "lucide-react";
 
 export default function SurveyStep4Page() {
     // 1. 프로그레스 바의 초기 상태를 '이전 단계(25%)'로 설정합니다.
@@ -17,19 +17,19 @@ export default function SurveyStep4Page() {
     }, []);
 
   return (
-    <main className="flex flex-col min-h-screen bg-[#F8F9FA] mx-auto max-w-md relative font-sans">
+    <main className="flex flex-col w-full h-full bg-[#F8F9FA] relative font-sans">
       
       {/* 상단 네비게이션 */}
       <header className="w-full bg-white px-4 py-4 flex items-center">
-        {/* 이전 단계(step3)로 돌아가기 */}
+        {/* 이전 단계(step2)로 돌아가기 */}
         <Link href="/survey/step3" className="inline-flex items-center hover:opacity-80 transition-opacity">
-          <img src="/icons/arrow.svg" alt="화살표 아이콘" className="w-5 h-5 mr-2 text-[#FFCC00]"/>
+          <img src="/icons/arrow.svg" alt="화살표 아이콘" className="w-5 h-5 mr-2 text-[#FFCC00]" />
           <span className="text-[#2F2F2F] font-medium text-lg">이전</span>
         </Link>
       </header>
 
       {/* 본문 컨텐츠 영역 */}
-      <div className="flex flex-col flex-1 px-6 pt-12 pb-8">
+      <div className="flex flex-col flex-1 px-6 pt-18 pb-8">
         
         {/* 질문 타이틀 */}
         <h1 className="text-2xl sm:text-[28px] font-bold text-[#1A1A1A] text-center mb-10 tracking-tight">
@@ -40,7 +40,7 @@ export default function SurveyStep4Page() {
         <div className="flex flex-col gap-5 mb-auto">
           
           {/* 카드 1: 특정 직무/분야 */}
-          <Link href="/survey/result" className="block w-full">
+          <Link href="/survey/loading" className="block w-full">
             <button className="w-full bg-white rounded-3xl p-6 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.08)] flex items-start gap-5 border-2 border-transparent hover:border-[#FFCC00] active:scale-[0.98] transition-all text-left">
               <div className="w-16 h-16 rounded-2xl bg-[#2F2F2F] flex items-center justify-center shrink-0">
                 <img src="/icons/map_pin.svg" alt="멥핀 아이콘" className="w-8 h-8 text-[#FFCC00]"/>
@@ -48,26 +48,22 @@ export default function SurveyStep4Page() {
               <div className="flex flex-col pt-1">
                 <h2 className="text-xl font-bold text-[#1A1A1A] mb-2">특정 직무/분야</h2>
                 <p className="text-[#666666] text-[15px] leading-relaxed break-keep">
-                  백엔드, 프론트엔드, 데이터 분석,<br />
-                  기획, 디자인 같은 특정 직무/분야에<br />
-                  대해 알고싶어요.
+                  백엔드, 프론트엔드, 데이터 분석, 기획, 디자인 같은 특정 직무/분야에 대해 알고싶어요.
                 </p>
               </div>
             </button>
           </Link>
 
           {/* 카드 2: 전체 산업군 */}
-          <Link href="/survey/result" className="block w-full">
+          <Link href="/survey/loading" className="block w-full">
             <button className="w-full bg-white rounded-3xl p-6 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.08)] flex items-start gap-5 border-2 border-transparent hover:border-[#FFCC00] active:scale-[0.98] transition-all text-left">
               <div className="w-16 h-16 rounded-2xl bg-[#2F2F2F] flex items-center justify-center shrink-0">
-                <Globe className="w-8 h-8 text-[#FFCC00]" strokeWidth={2} />
+                <Map className="w-8 h-8 text-[#FFCC00]" strokeWidth={2} />
               </div>
               <div className="flex flex-col pt-1">
                 <h2 className="text-xl font-bold text-[#1A1A1A] mb-2">전체 산업군</h2>
                 <p className="text-[#666666] text-[15px] leading-relaxed break-keep">
-                  이커머스, 핀테크, AI, 게임 등<br />
-                  관심 있는 영역의 전체 산업군에<br />
-                  대해 알고싶어요.
+                  이커머스, 핀테크, AI, 게임 등 관심 있는 영역의 전체 산업에 대해 알고싶어요.
                 </p>
               </div>
             </button>

@@ -4,12 +4,12 @@ import Link from "next/link";
 import { ChevronLeft, Briefcase, Search } from "lucide-react";
 
 export default function SurveyStep1Page() {
-    // 1. 프로그레스 바의 초기 상태를 '이전 단계(25%)'로 설정합니다.
+    // 1. 프로그레스 바의 초기 상태를 '시작 단계(4%)'로 설정합니다.
     const [progressWidth, setProgressWidth] = useState("4%");
 
     // 2. 화면이 켜지자마자 실행되는 애니메이션 로직
     useEffect(() => {
-        // 0.05초 뒤에 현재 단계(50%)로 길이를 늘려줍니다. (스르륵 차오르는 효과 발생!)
+        // 0.05초 뒤에 현재 단계(25%)로 길이를 늘려줍니다. (스르륵 차오르는 효과 발생!)
         const timer = setTimeout(() => {
         setProgressWidth("25%");
         }, 50);
@@ -17,7 +17,7 @@ export default function SurveyStep1Page() {
     }, []);
 
   return (
-    <main className="flex flex-col min-h-screen bg-[#F8F9FA] mx-auto max-w-md relative font-sans">
+    <main className="flex flex-col w-full h-full bg-[#F8F9FA] relative font-sans">
       
       {/* 상단 네비게이션 */}
       <header className="w-full bg-white px-4 py-4 flex items-center">
@@ -29,7 +29,7 @@ export default function SurveyStep1Page() {
       </header>
 
       {/* 본문 컨텐츠 영역 */}
-      <div className="flex flex-col flex-1 px-6 pt-12 pb-8">
+      <div className="flex flex-col flex-1 px-6 pt-18 pb-8">
         
         {/* 질문 타이틀 */}
         <h1 className="text-2xl sm:text-[28px] font-bold text-[#1A1A1A] text-center mb-10 tracking-tight">
@@ -50,9 +50,7 @@ export default function SurveyStep1Page() {
                     <div className="flex flex-col pt-1">
                     <h2 className="text-xl font-bold text-[#1A1A1A] mb-2">취업 준비형</h2>
                     <p className="text-[#666666] text-[15px] leading-relaxed break-keep">
-                        당장 포트폴리오 완성,<br />
-                        면접 대비, 직무 역량 강화가<br />
-                        시급해요.
+                        당장 포트폴리오 완성, 면접 대비, 직무 역량 강화가 시급해요.
                     </p>
                     </div>
                 </button>
@@ -70,10 +68,7 @@ export default function SurveyStep1Page() {
                     <div className="flex flex-col pt-1">
                     <h2 className="text-xl font-bold text-[#1A1A1A] mb-2">직무 탐색형</h2>
                     <p className="text-[#666666] text-[15px] leading-relaxed break-keep">
-                        해당 분야의 생생한<br />
-                        현업 이야기를 듣거나,<br />
-                        같은 고민을 하는 사람들과<br />
-                        교류하고 싶어요.
+                        해당 분야의 생생한 현업 이야기를 듣거나, 같은 고민을 하는 사람들과 교류하고 싶어요.
                     </p>
                     </div>
                 </button>
