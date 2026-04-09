@@ -1,0 +1,35 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+@import "tailwindcss";
+
+:root {
+  --background: #111111;
+  --foreground: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #111111;
+    --foreground: #ffffff;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  
+  /* 1. Tailwind의 기본 sans 폰트를 Pretendard로 덮어씁니다. */
+  --font-sans: "Pretendard", ui-sans-serif, system-ui, sans-serif;
+  
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  
+  /* 2. 기존 Arial 대신 위에서 설정한 Pretendard 폰트 변수를 적용합니다. */
+  font-family: var(--font-sans);
+  
+  /* 3. 모바일 터치 시 깜빡이는 하이라이트를 없애 앱처럼 보이게 합니다. */
+  -webkit-tap-highlight-color: transparent;
+}
