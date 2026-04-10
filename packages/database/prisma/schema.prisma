@@ -59,7 +59,6 @@ model User {
   askedQuestions     Question[]
   scripts            Script[]
   chats              MentoringChat[]
-  surveySubmission   SurveySubmission?
 
   @@map("users")
 }
@@ -82,14 +81,15 @@ model Mentor {
 
 // 멘티 프로필
 model Mentee {
-  menteeId   BigInt   @id @default(autoincrement()) @map("mentee_id")
-  balance    Int      @default(0)
-  surveyData Json?    @map("survey_data")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  userId     BigInt   @unique @map("user_id")
+  menteeId        BigInt   @id @default(autoincrement()) @map("mentee_id")
+  balance         Int      @default(0)
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  userId          BigInt   @unique @map("user_id")
+  surveyResultId  BigInt   @map("survey_result_id")
 
   // 관계 설정
-  user User @relation(fields: [userId], references: [userId])
+  user           User         @relation(fields: [userId], references: [userId])
+  survey_results SurveyResult @relation(fields: [surveyResultId], references: [surveyResultId])
 
   @@map("mentees")
 }
@@ -219,10 +219,9 @@ model AiRecommendation {
 // 사전 설문 질문
 model SurveyQuestion {
   surveyQuestionId  BigInt                 @id @default(autoincrement()) @map("survey_question_id")
-  code              String                 @unique @db.VarChar(30)
+  code              String                 @unique @db.VarChar(50)
   content           String                 @db.VarChar(200)
   displayOrder      Int                    @map("display_order")
-  createdAt         DateTime               @default(now()) @map("created_at")
 
   options         SurveyQuestionOption[]
 
@@ -232,45 +231,26 @@ model SurveyQuestion {
 // 사전 설문 질문 선택지
 model SurveyQuestionOption {
   surveyQuestionOptionId  BigInt         @id @default(autoincrement()) @map("survey_question_option_id")
-  surveyQuestionId        BigInt         @map("survey_question_id")
   code                    String         @db.VarChar(20)
-  label                   String         @db.VarChar(100)
-  description             String?        @db.VarChar(200)
+  label                 String         @db.VarChar(100)
+  description             String         @db.VarChar(200)
   displayOrder            Int            @map("display_order")
+  surveyQuestionId        BigInt         @map("survey_question_id")
 
-  question              SurveyQuestion @relation(fields: [surveyQuestionId], references: [surveyQuestionId])
+  question                SurveyQuestion @relation(fields: [surveyQuestionId], references: [surveyQuestionId])
 
   @@unique([surveyQuestionId, code])
   @@map("survey_question_options")
 }
 
 // 사전 설문 결과 유형
-model SurveyResultType {
-  surveyResultTypeId BigInt   @id @default(autoincrement()) @map("survey_result_type_id")
-  code              String   @unique @db.VarChar(50)
-  title             String   @db.VarChar(100)
-  description       String   @db.Text
-  traits            Json
-  combinationKey    String   @unique @db.VarChar(20) @map("combination_key")
-  createdAt         DateTime @default(now()) @map("created_at")
-
-  submissions       SurveySubmission[]
-
-  @@map("survey_result_types")
-}
-
-// 사전 설문 제출 결과
-model SurveySubmission {
-  surveySubmissionId  BigInt   @id @default(autoincrement()) @map("survey_submission_id")
-  userId              BigInt   @unique @map("user_id")
-  answers             Json
-  combinationKey      String   @db.VarChar(20) @map("combination_key")
-  surveyResultTypeId  BigInt   @map("survey_result_type_id")
+model SurveyResult {
+  surveyResultId      BigInt   @id @default(autoincrement()) @map("survey_result_id")
+  combinationCode     String   @unique @db.VarChar(20) @map("combination_key")
+  title               String   @db.VarChar(100)
   createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
 
-  user       User             @relation(fields: [userId], references: [userId])
-  resultType SurveyResultType @relation(fields: [surveyResultTypeId], references: [surveyResultTypeId])
+  mentees             Mentee[]
 
-  @@map("survey_submissions")
+  @@map("survey_results")
 }

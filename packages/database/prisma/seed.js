@@ -40,7 +40,7 @@ const surveyQuestions = [
     },
 ];
 
-const surveyResultTypes = {
+const surveyResult = {
     "AAAA": "불도저 스나이퍼",
     "AAAB": "야망의 야생마",
     "AABA": "열정의 레이서",
@@ -62,11 +62,64 @@ const surveyResultTypes = {
 async function main() {
     const fields = Object.values(FieldName);
 
+    // 분야 데이터 시드
     for (const name of fields) {
         await prisma.field.upsert({
             where: { fieldName: name },
             update: {},
             create: { fieldName: name },
+        });
+    }
+
+    // 사전 설문 질문 및 옵션 시드
+    for (const question of surveyQuestions) {
+        // 질문
+        const surveyQuestion = await prisma.surveyQuestion.upsert({
+            where: { code: question.code },
+            update: {
+                content: question.content,
+                displayOrder: question.displayOrder,
+            },
+            create: {
+                code: question.code,
+                content: question.content,
+                displayOrder: question.displayOrder,
+            },
+        });
+
+        // 선택지
+        for (const option of question.options) {
+            await prisma.surveyQuestionOption.upsert({
+                where: {
+                    surveyQuestionId_code: {
+                        surveyQuestionId: surveyQuestion.surveyQuestionId,
+                        code: option.code,
+                    },
+                },
+                update: {
+                    label: option.label,
+                    description: option.description,
+                    displayOrder: option.displayOrder,
+                },
+                create: {
+                    surveyQuestionId: surveyQuestion.surveyQuestionId,
+                    code: option.code,
+                    label: option.label,
+                    description: option.description,
+                    displayOrder: option.displayOrder,
+                },
+            });
+        }
+    }
+
+    for (const [combinationCode, title] of Object.entries(surveyResult)) {
+        await prisma.surveyResult.upsert({
+            where: { combinationCode },
+            update: { title },
+            create: {
+                combinationCode,
+                title,
+            },
         });
     }
 }

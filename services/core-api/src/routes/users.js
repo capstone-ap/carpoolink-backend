@@ -1,17 +1,17 @@
 import { Router } from 'express';
-import { prisma } from '../lib/prisma.js';
+import { prisma } from '@carpoolink/database';
 import { getUserIdFromRequest, requireUser } from '../middleware/requireUser.js';
 import { serialize } from '../utils/serialize.js';
 
 const router = Router();
 
-// 사용자 존재 여부 조회 엔드포인트
+// [GET] /users/exists - 사용자 존재 여부 확인
 router.get('/exists', async (req, res, next) => {
     try {
         const userId = getUserIdFromRequest(req);
 
         if (userId === null) {
-            return res.status(400).json({ message: 'x-user-id header is required.' });
+            return res.status(400).json({ message: 'x-user-id header가 필요합니다.' });
         }
 
         const user = await prisma.user.findUnique({
@@ -30,13 +30,17 @@ router.get('/exists', async (req, res, next) => {
     }
 });
 
-// 현재 사용자 정보 조회 엔드포인트
+// [GET] /users/me - 현재 사용자 정보 조회
 router.get('/me', requireUser, async (req, res, next) => {
     try {
         const user = await prisma.user.findUnique({
             where: { userId: req.user.userId },
             include: {
-                menteeProfile: true,
+                menteeProfile: {
+                    include: {
+                        surveyResult: true,
+                    },
+                },
                 mentorProfile: {
                     include: {
                         MentorField: {
@@ -46,16 +50,11 @@ router.get('/me', requireUser, async (req, res, next) => {
                         },
                     },
                 },
-                surveySubmission: {
-                    include: {
-                        resultType: true,
-                    },
-                },
             },
         });
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+            return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
         }
 
         res.json(
@@ -64,16 +63,19 @@ router.get('/me', requireUser, async (req, res, next) => {
                 email: user.email,
                 nickname: user.nickname,
                 role: user.role,
-                balance: user.menteeProfile?.balance ?? 0,
-                surveyData: user.menteeProfile?.surveyData ?? null,
-                surveyResult: user.surveySubmission?.resultType ?? null,
+                // 멘티 정보
+                menteeProfile: user.menteeProfile
+                    ? {
+                        menteeId: user.menteeProfile.menteeId,
+                        balance: user.menteeProfile?.balance ?? 0,
+                        surveyResult: user.menteeProfile?.surveyResult?.title ?? null,
+                    }
+                    : null,
+                // 멘토 정보
                 mentorProfile: user.mentorProfile
                     ? {
                         mentorId: user.mentorProfile.mentorId,
                         bio: user.mentorProfile.bio,
-                        info: user.mentorProfile.info,
-                        price: user.mentorProfile.price,
-                        fields: user.mentorProfile.MentorField.map((mentorField) => mentorField.field.fieldName),
                     }
                     : null,
             })
