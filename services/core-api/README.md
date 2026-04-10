@@ -7,3 +7,21 @@
 ```bash
 npm run dev -w services/core-api
 ```
+
+## Request Header
+
+- `x-user-id`: 사용자 ID
+
+## Main Routes
+
+- `GET /health`
+- `GET /survey/config`
+- `POST /survey/results`
+- `GET /users/exists`
+- `GET /users/me`
+- `GET /mentors`
+- `GET /mentors/:mentorId`
+- `GET /mentorings/group`
+- `GET /mentorings/one-on-one/peers`
+- `GET /scripts`
+- `GET /scripts/participated`

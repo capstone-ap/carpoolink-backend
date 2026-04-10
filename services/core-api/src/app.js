@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import apiRouter from './routes/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,8 +18,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 // 테스트 엔드포인트
-app.get('/', (req, res) => {
+app.get('/', (res) => {
     res.json({ message: '2026 Capstone AP - Carpoolink' });
 });
+
+app.get('/health', (res) => {
+    res.json({ ok: true });
+});
+
+app.use(apiRouter);
 
 export default app;
