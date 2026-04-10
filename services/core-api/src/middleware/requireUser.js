@@ -35,6 +35,7 @@ export async function requireUser(req, res, next) {
         return res.status(404).json({ message: 'User not found.' });
     }
 
+    // req 객체에 사용자 정보 저장
     req.user = user;
     return next();
 }

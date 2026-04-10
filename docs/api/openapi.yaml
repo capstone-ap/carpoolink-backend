@@ -9,30 +9,30 @@ paths:
       responses:
         '200':
           description: OK
-  /survey/config:
+  /survey:
     get:
-      summary: Get survey questions and result types
+      summary: 사전 설문의 질문과 선택지 조회
       responses:
         '200':
-          description: Survey configuration
+          description: 설문 질문과 선택지 목록 반환
   /survey/results:
     post:
-      summary: Save survey result
+      summary: 사전 설문 결과 제출 및 유형 판정
       responses:
-        '201':
-          description: Survey submission saved
+        '200':
+          description: 사전 설문 결과 및 유형 저장 및 반환
   /users/exists:
     get:
-      summary: Check whether the trusted user exists
+      summary: 사용자 존재 여부 확인
       responses:
         '200':
-          description: User lookup result
+          description: 사용자 존재 여부 반환
   /users/me:
     get:
-      summary: Get my profile summary
+      summary: 사용자 프로필 조회
       responses:
         '200':
-          description: Current user profile
+          description: 사용자 프로필 정보 반환
   /mentors:
     get:
       summary: List mentors

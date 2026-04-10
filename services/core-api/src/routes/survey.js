@@ -1,14 +1,18 @@
 import { Router } from 'express';
-import { prisma } from '../lib/prisma.js';
-import { requireUser } from '../middleware/requireUser.js';
+import { prisma } from '@carpoolink/database';
+import { requireUser, getUserIdFromRequest } from '../middleware/requireUser.js';
 import { serialize } from '../utils/serialize.js';
 
 const router = Router();
 
-// 설문 질문과 결과 유형 조회 엔드포인트
+function isMentee(user) {
+    return user.role === 'MENTEE';
+}
+
+// [GET] /survey - 사전 설문의 질문과 선택지 조회
 router.get('/', async (req, res, next) => {
     try {
-        const questions = await prisma.surveyQuestion.findMany({
+        const surveyQuestions = await prisma.surveyQuestion.findMany({
             orderBy: { displayOrder: 'asc' },
             include: {
                 options: {
@@ -17,97 +21,76 @@ router.get('/', async (req, res, next) => {
             },
         });
 
-        const resultTypes = await prisma.surveyResultType.findMany({
-            orderBy: { combinationKey: 'asc' },
-        });
-
-        res.json(
-            serialize({
-                questions,
-                resultTypes,
-            })
-        );
+        res.json(serialize({ surveyQuestions }));
     } catch (error) {
         next(error);
     }
 });
 
-// 설문 결과 제출 엔드포인트
-router.post('/results', requireUser, async (req, res, next) => {
+// [POST] /survey/submit - 설문 결과 제출 및 유형 판정
+router.post('/submit', requireUser, async (req, res, next) => {
     try {
-        const { answers } = req.body ?? {};
-
+        // 요청 검증
+        if (!isMentee(req.user)) {
+            return res.status(403).json({ message: '멘티만 설문에 참여할 수 있습니다.' });
+        }
+        const { answers } = req.body;
         if (!answers || typeof answers !== 'object') {
-            return res.status(400).json({ message: 'answers object is required.' });
+            return res.status(400).json({ message: '답변 데이터가 필요합니다.' });
         }
 
-        const questions = await prisma.surveyQuestion.findMany({
+        // 설문 질문과 선택지 조회
+        const surveyQuestions = await prisma.surveyQuestion.findMany({
             orderBy: { displayOrder: 'asc' },
-            include: {
-                options: {
-                    orderBy: { displayOrder: 'asc' },
-                },
-            },
+            include: { options: true },
         });
 
-        if (questions.length === 0) {
-            return res.status(503).json({ message: 'Survey questions are not configured.' });
-        }
-
         const normalizedAnswers = [];
-        let combinationKey = '';
+        let combinationCode = '';
 
-        for (const question of questions) {
+        // 답변 검증 및 combinationCode 생성
+        for (const question of surveyQuestions) {
             const selectedCode = answers[question.code];
-
             if (!selectedCode) {
-                return res.status(400).json({ message: `Missing answer for ${question.code}.` });
+                return res.status(400).json({ message: ` ${question.code}에 대한 답변이 누락되었습니다.` });
             }
 
             const selectedOption = question.options.find((option) => option.code === selectedCode);
-
             if (!selectedOption) {
-                return res.status(400).json({ message: `Invalid answer for ${question.code}.` });
+                return res.status(400).json({ message: ` ${question.code}에 대한 유효하지 않은 답변입니다.` });
             }
 
-            combinationKey += selectedOption.code;
+            combinationCode += selectedOption.code;
             normalizedAnswers.push({
-                questionCode: question.code,
-                question: question.content,
-                optionCode: selectedOption.code,
-                optionLabel: selectedOption.label,
+                question: question.code,     // 질문
+                answer: selectedOption.label    // 선택지
             });
         }
 
-        const resultType = await prisma.surveyResultType.findUnique({
-            where: { combinationKey },
+        // 사전설문 결과(유형) 조회
+        const result = await prisma.surveyResult.findUnique({
+            where: { combinationCode },
         });
-
-        if (!resultType) {
-            return res.status(404).json({ message: 'Survey result type not found for this combination.' });
+        if (!result) {
+            return res.status(404).json({ message: '설문 결과를 찾을 수 없습니다.' });
         }
 
-        const submission = await prisma.surveySubmission.upsert({
+        // 멘티 정보 업데이트
+        const mentee = await prisma.mentee.update({
             where: { userId: req.user.userId },
-            update: {
-                answers: normalizedAnswers,
-                combinationKey,
-                surveyResultTypeId: resultType.surveyResultTypeId,
-            },
-            create: {
-                userId: req.user.userId,
-                answers: normalizedAnswers,
-                combinationKey,
-                surveyResultTypeId: resultType.surveyResultTypeId,
+            data: {
+                surveyResultId: result.surveyResultId,
             },
             include: {
-                resultType: true,
-            },
+                surveyResult: true,
+            }
         });
 
-        res.status(201).json(
+        // 성공 응답 반환
+        res.status(200).json(
             serialize({
-                submission,
+                result: mentee.surveyResult, // ex) { combinationCode: "AABB", title: "공감형 전략자" }
+                answers: normalizedAnswers   // ex) [ { question: "goal", answer: "취업 준비형" }, ... ]
             })
         );
     } catch (error) {
