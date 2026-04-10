@@ -35,37 +35,37 @@ paths:
           description: 사용자 프로필 정보 반환
   /mentors:
     get:
-      summary: List mentors
+      summary: 멘토 목록 조회
       responses:
         '200':
-          description: Mentor list
+          description: 멘토 목록 반환
   /mentors/{mentorId}:
     get:
-      summary: Get mentor detail
+      summary: 멘토 상세 정보 조회
       responses:
         '200':
-          description: Mentor detail
+          description: 멘토 상세 정보 반환
   /mentorings/group:
     get:
-      summary: List group mentorings
+      summary: 일대다 멘토링 목록 조회
       responses:
         '200':
-          description: Group mentoring list
-  /mentorings/one-on-one/peers:
+          description: 일대다 멘토링 목록 반환
+  /mentorings/one-on-one:
     get:
-      summary: List one-on-one peers
+      summary: 일대일 멘토링 목록 조회
       responses:
         '200':
-          description: One-on-one peer list
+          description: 일대일 멘토링 목록 반환
   /scripts:
     get:
-      summary: List all scripts
+      summary: 접근 가능한(멘토링에 참여했던) 스크립트 목록 조회
       responses:
         '200':
-          description: Script list
-  /scripts/participated:
+          description: 스크립트 목록 반환
+  /scripts/{mentoringId}:
     get:
-      summary: List scripts from mentorings the trusted user participated in
+      summary: 스크립트 전문 조회
       responses:
         '200':
-          description: Participated script list
+          description: 스크립트 전문 반환
