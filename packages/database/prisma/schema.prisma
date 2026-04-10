@@ -9,7 +9,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-
 // Enums
 
 enum UserRole {
@@ -74,7 +73,7 @@ model Mentor {
 
   // 관계 설정
   user User @relation(fields: [userId], references: [userId])
-  MentorField MentorField[]
+  fields Field[]
 
   @@map("mentors")
 }
@@ -114,22 +113,9 @@ model Field {
   fieldName FieldName   @unique @map("field_name")
 
   // 관계 설정
-  mentors MentorField[]
+  mentors Mentor[]
 
   @@map("fields")
-}
-
-// 멘토-분야 중간 테이블
-model MentorField {
-  mentorId  BigInt @map("mentor_id")
-  fieldId   BigInt @map("field_id")
-
-  // 관계 설정
-  mentor  Mentor  @relation(fields: [mentorId], references: [mentorId])
-  field   Field @relation(fields: [fieldId], references: [fieldId])
-
-  @@id([mentorId, fieldId])
-  @@map("mentor_field")
 }
 
 // 온라인 멘토링 세션

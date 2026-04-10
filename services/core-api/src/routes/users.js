@@ -43,11 +43,7 @@ router.get('/me', requireUser, async (req, res, next) => {
                 },
                 mentorProfile: {
                     include: {
-                        MentorField: {
-                            include: {
-                                field: true,
-                            },
-                        },
+                        field: true,
                     },
                 },
             },
