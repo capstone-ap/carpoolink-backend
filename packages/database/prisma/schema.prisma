@@ -59,6 +59,7 @@ model User {
   askedQuestions     Question[]
   scripts            Script[]
   chats              MentoringChat[]
+  surveySubmission   SurveySubmission?
 
   @@map("users")
 }
@@ -213,4 +214,63 @@ model AiRecommendation {
   mentoring Mentoring @relation(fields: [mentoringId], references: [mentoringId])
 
   @@map("ai_recommendations")
+}
+
+// 사전 설문 질문
+model SurveyQuestion {
+  surveyQuestionId  BigInt                 @id @default(autoincrement()) @map("survey_question_id")
+  code              String                 @unique @db.VarChar(30)
+  content           String                 @db.VarChar(200)
+  displayOrder      Int                    @map("display_order")
+  createdAt         DateTime               @default(now()) @map("created_at")
+
+  options         SurveyQuestionOption[]
+
+  @@map("survey_questions")
+}
+
+// 사전 설문 질문 선택지
+model SurveyQuestionOption {
+  surveyQuestionOptionId  BigInt         @id @default(autoincrement()) @map("survey_question_option_id")
+  surveyQuestionId        BigInt         @map("survey_question_id")
+  code                    String         @db.VarChar(20)
+  label                   String         @db.VarChar(100)
+  description             String?        @db.VarChar(200)
+  displayOrder            Int            @map("display_order")
+
+  question              SurveyQuestion @relation(fields: [surveyQuestionId], references: [surveyQuestionId])
+
+  @@unique([surveyQuestionId, code])
+  @@map("survey_question_options")
+}
+
+// 사전 설문 결과 유형
+model SurveyResultType {
+  surveyResultTypeId BigInt   @id @default(autoincrement()) @map("survey_result_type_id")
+  code              String   @unique @db.VarChar(50)
+  title             String   @db.VarChar(100)
+  description       String   @db.Text
+  traits            Json
+  combinationKey    String   @unique @db.VarChar(20) @map("combination_key")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  submissions       SurveySubmission[]
+
+  @@map("survey_result_types")
+}
+
+// 사전 설문 제출 결과
+model SurveySubmission {
+  surveySubmissionId  BigInt   @id @default(autoincrement()) @map("survey_submission_id")
+  userId              BigInt   @unique @map("user_id")
+  answers             Json
+  combinationKey      String   @db.VarChar(20) @map("combination_key")
+  surveyResultTypeId  BigInt   @map("survey_result_type_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  user       User             @relation(fields: [userId], references: [userId])
+  resultType SurveyResultType @relation(fields: [surveyResultTypeId], references: [surveyResultTypeId])
+
+  @@map("survey_submissions")
 }

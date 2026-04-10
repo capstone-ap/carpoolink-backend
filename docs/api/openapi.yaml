@@ -9,3 +9,63 @@ paths:
       responses:
         '200':
           description: OK
+  /survey/config:
+    get:
+      summary: Get survey questions and result types
+      responses:
+        '200':
+          description: Survey configuration
+  /survey/results:
+    post:
+      summary: Save survey result
+      responses:
+        '201':
+          description: Survey submission saved
+  /users/exists:
+    get:
+      summary: Check whether the trusted user exists
+      responses:
+        '200':
+          description: User lookup result
+  /users/me:
+    get:
+      summary: Get my profile summary
+      responses:
+        '200':
+          description: Current user profile
+  /mentors:
+    get:
+      summary: List mentors
+      responses:
+        '200':
+          description: Mentor list
+  /mentors/{mentorId}:
+    get:
+      summary: Get mentor detail
+      responses:
+        '200':
+          description: Mentor detail
+  /mentorings/group:
+    get:
+      summary: List group mentorings
+      responses:
+        '200':
+          description: Group mentoring list
+  /mentorings/one-on-one/peers:
+    get:
+      summary: List one-on-one peers
+      responses:
+        '200':
+          description: One-on-one peer list
+  /scripts:
+    get:
+      summary: List all scripts
+      responses:
+        '200':
+          description: Script list
+  /scripts/participated:
+    get:
+      summary: List scripts from mentorings the trusted user participated in
+      responses:
+        '200':
+          description: Participated script list
