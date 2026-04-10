@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import apiRouter from './routes/index.js';
+import swaggerUi from 'swagger-ui-express';
+import outputFile from '../swagger-output.json' with { type: 'json' };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,17 +14,20 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 const app = express();
 
+// Swagger UI 설정
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(outputFile));
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 // 테스트 엔드포인트
-app.get('/', (res) => {
+app.get('/', (req, res) => {
     res.json({ message: '2026 Capstone AP - Carpoolink' });
 });
 
-app.get('/health', (res) => {
+app.get('/health', (req, res) => {
     res.json({ ok: true });
 });
 
