@@ -62,7 +62,14 @@ function canViewPrivateScript(script, viewerUserId) {
 // 조회 권한을 확인해 마스킹/비공개 처리가 완료된 스크립트 단락을 반환하는 함수
 function getVisibleContent(script, viewerUserId) {
     if (!canViewPrivateScript(script, viewerUserId)) {
-        return { visible: false, reason: 'private' };
+        return {
+            visible: true,
+            masked: false,
+            content: {
+                isPrivate: true,
+                message: '비공개 질문입니다.',
+            },
+        };
     }
 
     if (hasMaskedFlag(script.content)) {
@@ -87,10 +94,6 @@ function getVisibleContent(script, viewerUserId) {
 // 스크립트 단락을 클라이언트에 반환할 형태로 매핑하는 함수
 function mapScriptParagraph(script, viewerUserId) {
     const visibility = getVisibleContent(script, viewerUserId);
-
-    if (!visibility.visible) {
-        return null;
-    }
 
     return {
         scriptId: script.scriptId,
@@ -122,7 +125,13 @@ router.get('/', requireUser, async (req, res, next) => {
                 },
             },
             include: {
-                hostMentor: true,
+                hostMentor: {
+                    include: {
+                        mentorProfile: {
+                            select: { mentorId: true },
+                        },
+                    },
+                },
                 _count: {
                     select: {
                         scripts: true,
@@ -143,6 +152,7 @@ router.get('/', requireUser, async (req, res, next) => {
                     host: {
                         userId: mentoring.hostMentor.userId,
                         nickname: mentoring.hostMentor.nickname,
+                        mentorId: mentoring.hostMentor.mentorProfile?.mentorId ?? null,
                     },
                     scriptCount: mentoring._count.scripts,
                 })),
@@ -173,7 +183,13 @@ router.get('/:mentoringId', requireUser, async (req, res, next) => {
                 },
             },
             include: {
-                hostMentor: true,
+                hostMentor: {
+                    include: {
+                        mentorProfile: {
+                            select: { mentorId: true },
+                        },
+                    },
+                },
                 scripts: {
                     include: {
                         user: true,
@@ -203,6 +219,7 @@ router.get('/:mentoringId', requireUser, async (req, res, next) => {
                     status: mentoring.status,
                     isGroup: mentoring.isGroup,
                     host: {
+                        mentorId: mentoring.hostMentor.mentorProfile?.mentorId ?? null,
                         userId: mentoring.hostMentor.userId,
                         nickname: mentoring.hostMentor.nickname,
                     },

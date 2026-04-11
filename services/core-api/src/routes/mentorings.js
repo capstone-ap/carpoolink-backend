@@ -70,7 +70,13 @@ router.get('/one-on-one', requireUser, async (req, res, next) => {
                 ],
             },
             include: {
-                hostMentor: true,
+                hostMentor: {
+                    include: {
+                        mentorProfile: {
+                            select: { mentorId: true },
+                        },
+                    },
+                },
                 participants: {
                     include: { user: true },
                 },
@@ -88,6 +94,7 @@ router.get('/one-on-one', requireUser, async (req, res, next) => {
                 peers.set(peerInfo.userId.toString(), {
                     userId: peerInfo.userId,
                     nickname: peerInfo.nickname,
+                    mentorId: isHost ? null : mentoring.hostMentor.mentorProfile?.mentorId ?? null,
                 });
             }
         }
