@@ -1,71 +1,781 @@
 openapi: 3.1.0
 info:
-  title: Carpoolink Mentoring Platform API
+  title: Carpoolink API
   version: 0.1.0
+  description: 사용자 식별이 필요한 API는 `x-user-id` 헤더가 필요합니다.
+servers:
+  - url: http://localhost:3001
+tags:
+  - name: System
+  - name: Survey
+  - name: Users
+  - name: Mentors
+  - name: Mentorings
+  - name: Scripts
+
+# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------
+# 엔드포인트 정의: URI, HTTP 메서드, 요청/응답 스펙 등
+
 paths:
   /health:
     get:
       summary: Health check
+      operationId: getHealth
+      tags: [System]
       responses:
         '200':
-          description: OK
-  /survey:
+          description: 서비스 상태 정상
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                ok: true
+
+  /surveys:
     get:
       summary: 사전 설문의 질문과 선택지 조회
+      operationId: getSurveyQuestions
+      tags: [Survey]
       responses:
         '200':
           description: 설문 질문과 선택지 목록 반환
-  /survey/results:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SurveyQuestionListResponse'
+              example:
+                surveyQuestions:
+                  - surveyQuestionId: '1'
+                    code: GOAL
+                    question: 멘토링 목표는 무엇인가요?
+                    displayOrder: 1
+                    options:
+                      - surveyQuestionOptionId: '11'
+                        code: A
+                        label: 취업 준비
+                        displayOrder: 1
+                      - surveyQuestionOptionId: '12'
+                        code: B
+                        label: 실무 역량 강화
+                        displayOrder: 2
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /surveys/submit:
     post:
       summary: 사전 설문 결과 제출 및 유형 판정
+      operationId: submitSurvey
+      tags: [Survey]
+      parameters:
+        - $ref: '#/components/parameters/XUserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SurveySubmitRequest'
+            example:
+              answers:
+                goal: A
+                style: B
+                preference: A
+                focus: B
       responses:
         '200':
           description: 사전 설문 결과 및 유형 저장 및 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SurveySubmitResponse'
+              example:
+                result:
+                  surveyResultId: '3'
+                  combinationCode: ABAB
+                  title: 공감형 전략자
+                answers:
+                  - question: GOAL
+                    answer: 취업 준비
+                  - question: TIME
+                    answer: 주말 중심
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: 멘티가 아닌 사용자가 설문 제출 시도
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: 멘티만 설문에 참여할 수 있습니다.
+        '404':
+          description: 매칭되는 설문 유형 미존재 또는 사용자 미존재
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /users/exists:
     get:
       summary: 사용자 존재 여부 확인
+      operationId: getUserExists
+      tags: [Users]
+      parameters:
+        - $ref: '#/components/parameters/XUserIdHeader'
       responses:
         '200':
           description: 사용자 존재 여부 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserExistsResponse'
+              example:
+                exists: true
+                user:
+                  userId: '1001'
+                  nickname: 하늘
+                  role: MENTEE
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /users/me:
     get:
       summary: 사용자 프로필 조회
+      operationId: getMyProfile
+      tags: [Users]
+      parameters:
+        - $ref: '#/components/parameters/XUserIdHeader'
       responses:
         '200':
           description: 사용자 프로필 정보 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserMeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /mentors:
     get:
       summary: 멘토 목록 조회
+      operationId: getMentors
+      tags: [Mentors]
       responses:
         '200':
           description: 멘토 목록 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorListResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /mentors/{mentorId}:
     get:
       summary: 멘토 상세 정보 조회
+      operationId: getMentorById
+      tags: [Mentors]
+      parameters:
+        - $ref: '#/components/parameters/MentorIdPath'
       responses:
         '200':
           description: 멘토 상세 정보 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MentorDetailResponse'
+        '400':
+          description: mentorId 형식 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: 유효하지 않은 mentorId입니다.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /mentorings/group:
     get:
       summary: 일대다 멘토링 목록 조회
+      operationId: getGroupMentorings
+      tags: [Mentorings]
+      parameters:
+        - $ref: '#/components/parameters/MentoringStatusQuery'
       responses:
         '200':
           description: 일대다 멘토링 목록 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMentoringListResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /mentorings/one-on-one:
     get:
       summary: 일대일 멘토링 목록 조회
+      operationId: getOneOnOnePeers
+      tags: [Mentorings]
+      parameters:
+        - $ref: '#/components/parameters/XUserIdHeader'
       responses:
         '200':
-          description: 일대일 멘토링 목록 반환
+          description: 일대일 멘토링 상대 목록 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OneOnOnePeerListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /scripts:
     get:
-      summary: 접근 가능한(멘토링에 참여했던) 스크립트 목록 조회
+      summary: 접근 가능한(멘토링에 참여했던) 스크립트 목록(사실상 멘토링 목록) 조회
+      operationId: getScriptMentorings
+      tags: [Scripts]
+      parameters:
+        - $ref: '#/components/parameters/XUserIdHeader'
+        - $ref: '#/components/parameters/ScriptTypeQuery'
       responses:
         '200':
           description: 스크립트 목록 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScriptMentoringListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /scripts/{mentoringId}:
     get:
       summary: 스크립트 전문 조회
+      operationId: getScriptsByMentoringId
+      tags: [Scripts]
+      parameters:
+        - $ref: '#/components/parameters/XUserIdHeader'
+        - $ref: '#/components/parameters/MentoringIdPath'
       responses:
         '200':
           description: 스크립트 전문 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScriptDetailResponse'
+        '400':
+          description: mentoringId 형식 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: 유효하지 않은 mentoringId입니다.
+        '404':
+          description: 멘토링 없음 또는 접근 불가
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: 멘토링을 찾을 수 없거나 접근이 거부되었습니다.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------
+# 요청시 자주 사용되는 파라미터
+
+components:
+  parameters:
+    XUserIdHeader:
+      name: x-user-id
+      in: header
+      required: true
+      description: 인증/식별에 사용되는 사용자 ID(BigInt 문자열)
+      schema:
+        type: string
+        pattern: '^[0-9]+$'
+      example: '1001'
+    MentorIdPath:
+      name: mentorId
+      in: path
+      required: true
+      description: 조회할 멘토 ID(BigInt 문자열)
+      schema:
+        type: string
+        pattern: '^[0-9]+$'
+      example: '2001'
+    MentoringIdPath:
+      name: mentoringId
+      in: path
+      required: true
+      description: 조회할 멘토링 ID(BigInt 문자열)
+      schema:
+        type: string
+        pattern: '^[0-9]+$'
+      example: '3001'
+    MentoringStatusQuery:
+      name: status
+      in: query
+      required: false
+      description: |
+        1:N 멘토링 상태 필터.
+        미지정 또는 유효하지 않은 값은 서버에서 `ON_AIR`로 처리됩니다.
+      schema:
+        type: string
+        enum: [READY, ON_AIR, COMPLETED]
+        default: ON_AIR
+      example: ON_AIR
+    ScriptTypeQuery:
+      name: type
+      in: query
+      required: false
+      description: |
+        스크립트 목록 타입 필터.
+        미지정 또는 유효하지 않은 값은 서버에서 `all`로 처리됩니다.
+      schema:
+        type: string
+        enum: [all, group, one-on-one]
+        default: all
+      example: group
+
+  responses:
+    BadRequest:
+      description: 잘못된 요청
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: x-user-id header가 필요합니다.
+    NotFound:
+      description: 리소스를 찾을 수 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: 사용자를 찾을 수 없습니다.
+    InternalServerError:
+      description: 서버 내부 오류
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: Internal Server Error
+
+# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------
+# 요청/응답에 사용되는 데이터 모델 정의
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required: [ok]
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    UserIdentity:
+      type: object
+      properties:
+        userId:
+          type: string
+        nickname:
+          type: string
+        role:
+          type: string
+          enum: [MENTEE, MENTOR, ADMIN]
+      required: [userId, nickname, role]
+
+    SurveyOption:
+      type: object
+      properties:
+        surveyQuestionOptionId:
+          type: string
+          nullable: true
+        code:
+          type: string
+        label:
+          type: string
+        displayOrder:
+          type: integer
+          nullable: true
+      required: [code, label]
+
+    SurveyQuestion:
+      type: object
+      properties:
+        surveyQuestionId:
+          type: string
+          nullable: true
+        code:
+          type: string
+        question:
+          type: string
+          nullable: true
+        displayOrder:
+          type: integer
+          nullable: true
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/SurveyOption'
+      required: [code, options]
+
+    SurveyQuestionListResponse:
+      type: object
+      properties:
+        surveyQuestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SurveyQuestion'
+      required: [surveyQuestions]
+
+    SurveySubmitRequest:
+      type: object
+      properties:
+        answers:
+          type: object
+          description: 질문 코드 -> 선택지 코드 매핑
+          additionalProperties:
+            type: string
+      required: [answers]
+
+    SurveyResult:
+      type: object
+      description: DB의 surveyResult 전체 객체를 반환하며 필드는 확장될 수 있습니다.
+      properties:
+        surveyResultId:
+          type: string
+          nullable: true
+        combinationCode:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+      additionalProperties: true
+
+    SurveyAnswerSummary:
+      type: object
+      properties:
+        question:
+          type: string
+        answer:
+          type: string
+      required: [question, answer]
+
+    SurveySubmitResponse:
+      type: object
+      properties:
+        result:
+          $ref: '#/components/schemas/SurveyResult'
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SurveyAnswerSummary'
+      required: [result, answers]
+
+    UserExistsResponse:
+      type: object
+      properties:
+        exists:
+          type: boolean
+        user:
+          anyOf:
+            - $ref: '#/components/schemas/UserIdentity'
+            - type: 'null'
+      required: [exists, user]
+
+    MenteeProfile:
+      type: object
+      properties:
+        menteeId:
+          type: string
+        balance:
+          type: integer
+        surveyResult:
+          type: string
+          nullable: true
+      required: [menteeId, balance, surveyResult]
+
+    MentorProfile:
+      type: object
+      properties:
+        mentorId:
+          type: string
+        bio:
+          type: string
+          nullable: true
+      required: [mentorId, bio]
+
+    UserMeResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+        email:
+          type: string
+          format: email
+        nickname:
+          type: string
+        role:
+          type: string
+          enum: [MENTEE, MENTOR, ADMIN]
+        menteeProfile:
+          anyOf:
+            - $ref: '#/components/schemas/MenteeProfile'
+            - type: 'null'
+        mentorProfile:
+          anyOf:
+            - $ref: '#/components/schemas/MentorProfile'
+            - type: 'null'
+      required: [userId, email, nickname, role, menteeProfile, mentorProfile]
+
+    MentorSummary:
+      type: object
+      properties:
+        mentorId:
+          type: string
+        userId:
+          type: string
+        nickname:
+          type: string
+        price:
+          type: integer
+        fields:
+          type: array
+          items:
+            type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required: [mentorId, userId, nickname, price, fields, updatedAt]
+
+    MentorDetail:
+      allOf:
+        - $ref: '#/components/schemas/MentorSummary'
+        - type: object
+          properties:
+            bio:
+              type: string
+              nullable: true
+            info:
+              type: string
+              nullable: true
+          required: [bio, info]
+
+    MentorListResponse:
+      type: object
+      properties:
+        mentors:
+          type: array
+          items:
+            $ref: '#/components/schemas/MentorSummary'
+      required: [mentors]
+
+    MentorDetailResponse:
+      type: object
+      properties:
+        mentor:
+          $ref: '#/components/schemas/MentorDetail'
+      required: [mentor]
+
+    MentoringHost:
+      type: object
+      properties:
+        mentorId:
+          type: string
+          nullable: true
+        userId:
+          type: string
+        nickname:
+          type: string
+      required: [userId, nickname]
+
+    GroupMentoringItem:
+      type: object
+      properties:
+        mentoringId:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [READY, ON_AIR, COMPLETED]
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        host:
+          $ref: '#/components/schemas/MentoringHost'
+        participantCount:
+          type: integer
+      required: [mentoringId, title, status, startedAt, endedAt, host, participantCount]
+
+    GroupMentoringListResponse:
+      type: object
+      properties:
+        mentorings:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupMentoringItem'
+      required: [mentorings]
+
+    OneOnOnePeer:
+      type: object
+      properties:
+        mentorId:
+          type: string
+          nullable: true
+        userId:
+          type: string
+        nickname:
+          type: string
+      required: [mentorId, userId, nickname]
+
+    OneOnOnePeerListResponse:
+      type: object
+      properties:
+        peers:
+          type: array
+          items:
+            $ref: '#/components/schemas/OneOnOnePeer'
+      required: [peers]
+
+    ScriptMentoringItem:
+      type: object
+      properties:
+        mentoringId:
+          type: string
+        title:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        isGroup:
+          type: boolean
+        host:
+          $ref: '#/components/schemas/MentoringHost'
+        scriptCount:
+          type: integer
+      required: [mentoringId, title, startedAt, endedAt, isGroup, host, scriptCount]
+
+    ScriptMentoringListResponse:
+      type: object
+      properties:
+        mentorings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScriptMentoringItem'
+      required: [mentorings]
+
+    ScriptSpeaker:
+      type: object
+      properties:
+        userId:
+          type: string
+        nickname:
+          type: string
+          nullable: true
+        role:
+          type: string
+          nullable: true
+        isHostMentor:
+          type: boolean
+      required: [userId, nickname, role, isHostMentor]
+
+    ScriptParagraph:
+      type: object
+      properties:
+        scriptId:
+          type: string
+        isPrivate:
+          type: boolean
+        isMasked:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        content:
+          type: object
+          description: 원문 JSON 또는 마스킹 메시지 JSON
+          additionalProperties: true
+        speaker:
+          $ref: '#/components/schemas/ScriptSpeaker'
+      required: [scriptId, isPrivate, isMasked, createdAt, content, speaker]
+
+    ScriptMentoring:
+      type: object
+      properties:
+        mentoringId:
+          type: string
+        title:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [READY, ON_AIR, COMPLETED]
+        isGroup:
+          type: boolean
+        host:
+          $ref: '#/components/schemas/MentoringHost'
+      required: [mentoringId, title, startedAt, endedAt, status, isGroup, host]
+
+    ScriptDetailResponse:
+      type: object
+      properties:
+        mentoring:
+          $ref: '#/components/schemas/ScriptMentoring'
+        scripts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScriptParagraph'
+      required: [mentoring, scripts]

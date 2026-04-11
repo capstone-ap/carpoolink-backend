@@ -9,7 +9,7 @@ function isMentee(user) {
     return user.role === 'MENTEE';
 }
 
-// [GET] /survey - 사전 설문의 질문과 선택지 조회
+// [GET] /surveys - 사전 설문의 질문과 선택지 조회
 router.get('/', async (req, res, next) => {
     try {
         const surveyQuestions = await prisma.surveyQuestion.findMany({
@@ -27,7 +27,7 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-// [POST] /survey/submit - 설문 결과 제출 및 유형 판정
+// [POST] /surveys/submit - 설문 결과 제출 및 유형 판정
 router.post('/submit', requireUser, async (req, res, next) => {
     try {
         // 요청 검증

@@ -72,7 +72,7 @@ model Mentor {
   userId    BigInt   @unique @map("user_id")
 
   // 관계 설정
-  user User @relation(fields: [userId], references: [userId])
+  user   User @relation(fields: [userId], references: [userId])
   fields Field[]
 
   @@map("mentors")
@@ -84,11 +84,11 @@ model Mentee {
   balance         Int      @default(0)
   updatedAt       DateTime @updatedAt @map("updated_at")
   userId          BigInt   @unique @map("user_id")
-  surveyResultId  BigInt   @map("survey_result_id")
+  surveyResultId  BigInt?   @map("survey_result_id")
 
   // 관계 설정
   user           User         @relation(fields: [userId], references: [userId])
-  survey_results SurveyResult @relation(fields: [surveyResultId], references: [surveyResultId])
+  surveyResult   SurveyResult? @relation(fields: [surveyResultId], references: [surveyResultId])
 
   @@map("mentees")
 }
@@ -234,7 +234,6 @@ model SurveyResult {
   surveyResultId      BigInt   @id @default(autoincrement()) @map("survey_result_id")
   combinationCode     String   @unique @db.VarChar(20) @map("combination_key")
   title               String   @db.VarChar(100)
-  createdAt           DateTime @default(now()) @map("created_at")
 
   mentees             Mentee[]
 
