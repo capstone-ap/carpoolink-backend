@@ -5,7 +5,7 @@
 현재 구현은 1:N 온라인 멘토링 시나리오를 우선 지원합니다.
 
 - 멘토가 멘토링 시작 시 `mentorings` 레코드 생성
-- 멘티는 WebSocket 시그널링으로 입장 후 멘토의 비디오/오디오를 consume
+- 멘티는 Socket.IO 시그널링으로 입장 후 멘토의 비디오/오디오를 consume
 - 멘티는 채팅 기반 참여를 전제로 미디어 produce 제한
 - 오디오 파이프라인 확장 지점 제공(STT, 저장, TTS 믹싱)
 
@@ -27,15 +27,24 @@ npm run dev -w services/media-server
 DB 연결이 불가하면 in-memory 저장소로 fallback 합니다.
 반환된 mentoringId로 이후 동작을 수행합니다.
 
+요청 헤더:
+
+- `x-user-id`: 멘토 사용자 ID (필수)
+
 Request example:
 
 ```json
 {
 	"title": "프론트엔드 커리어 멘토링",
-	"userId": 1,
 	"isGroup": true
 }
 ```
+
+동작:
+
+- `x-user-id`로 사용자 조회
+- 사용자 role이 `MENTOR`인지 검증
+- 검증 통과 시 멘토링 생성
 
 ### `POST /mentorings/:mentoringId/end`
 
@@ -45,9 +54,9 @@ Request example:
 
 멘토링 메타데이터 + 현재 미디어 룸 스냅샷을 조회합니다.
 
-## WebSocket Signaling
+## Socket.IO Signaling
 
-Endpoint: `/ws`
+Endpoint: `/socket.io`
 
 메시지 포맷:
 
@@ -73,10 +82,12 @@ Endpoint: `/ws`
 
 - `joinMentoring`: `{ mentoringId, role, peerId? }`
 	- role: `mentor` | `mentee` | `tts-bot`
+	- mentor 역할은 `x-user-id` 또는 payload `userId`가 필요하며, host mentor와 일치해야 함
 - `createWebRtcTransport`: `{ direction: "send" | "recv" }`
 - `connectWebRtcTransport`: `{ transportId, dtlsParameters }`
 - `produce`: `{ transportId, kind, rtpParameters, appData }`
-- `consume`: `{ transportId, producerId, rtpCapabilities }`
+- `consume`: `{ transportId, producerId, rtpCapabilities, userId }`
+	- consume 호출 시 user 식별이 필수이며 `mentoring_histories` 참여 이력을 보장
 - `resumeConsumer`: `{ consumerId }`
 - `listProducers`: `{}`
 - `ttsEnqueue`: `{ text, metadata? }`
