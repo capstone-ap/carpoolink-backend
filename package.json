@@ -25,5 +25,12 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.4.1",
+    "fs": "^0.0.1-security",
+    "multer": "^2.1.1",
+    "nodejs-whisper": "^0.2.9",
+    "openai": "^6.34.0"
+  }
 }
