@@ -25,13 +25,14 @@ npm run dev -w services/media-server
 
 멘토링 세션을 시작합니다. DB(Prisma) 연결이 가능하면 `mentorings` 테이블에 레코드를 생성합니다.
 DB 연결이 불가하면 in-memory 저장소로 fallback 합니다.
+반환된 mentoringId로 이후 동작을 수행합니다.
 
 Request example:
 
 ```json
 {
 	"title": "프론트엔드 커리어 멘토링",
-	"mentorId": 101,
+	"userId": 1,
 	"isGroup": true
 }
 ```

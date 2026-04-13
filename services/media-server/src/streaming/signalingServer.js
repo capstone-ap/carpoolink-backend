@@ -75,7 +75,7 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
 
             try {
                 switch (action) {
-                    // joinMentoring: 클라이언트가 멘토링 세션에 참여할 때 호출되는 액션, mentoringId와 역할을 받아 해당 멘토링 세션이 LIVE 상태인지 확인한 후 미디어 오케스트레이터에 피어를 추가하고 성공 응답을 전송함
+                    // joinMentoring: 클라이언트가 멘토링 세션에 참여할 때 호출되는 액션, mentoringId와 역할을 받아 해당 멘토링 세션이 ON_AIR 상태인지 확인한 후 미디어 오케스트레이터에 피어를 추가하고 성공 응답을 전송함
                     case 'joinMentoring': {
                         const mentoringId = Number(data.mentoringId);
                         const role = data.role ?? 'mentee';
@@ -87,7 +87,7 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
 
                         const mentoring = await mentoringRepository.getMentoringById(mentoringId);
 
-                        if (!mentoring || mentoring.status !== 'LIVE') {
+                        if (!mentoring || mentoring.status !== 'ON_AIR') {
                             throw new Error('Mentoring session is not live');
                         }
 
