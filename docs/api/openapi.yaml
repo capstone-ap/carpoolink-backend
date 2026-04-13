@@ -7,7 +7,7 @@ servers:
   - url: http://localhost:3001
 tags:
   - name: System
-  - name: Survey
+  - name: Surveys
   - name: Users
   - name: Mentors
   - name: Mentorings
@@ -38,7 +38,7 @@ paths:
     get:
       summary: 사전 설문의 질문과 선택지 조회
       operationId: getSurveyQuestions
-      tags: [Survey]
+      tags: [Surveys]
       responses:
         '200':
           description: 설문 질문과 선택지 목록 반환
@@ -68,7 +68,7 @@ paths:
     post:
       summary: 사전 설문 결과 제출 및 유형 판정
       operationId: submitSurvey
-      tags: [Survey]
+      tags: [Surveys]
       parameters:
         - $ref: '#/components/parameters/XUserIdHeader'
       requestBody:
