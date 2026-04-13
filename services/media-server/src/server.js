@@ -19,6 +19,21 @@ const mediaOrchestrator = new MediaSoupOrchestrator({ audioPipeline });
 
 await mediaOrchestrator.init();
 
+// 요청에서 사용자 ID를 파싱하는 함수
+function parseUserIdFromRequest(req) {
+    const rawUserId = req.header('x-user-id') ?? req.header('user-id');
+
+    if (!rawUserId) {
+        return null;
+    }
+
+    try {
+        return Number(BigInt(rawUserId));
+    } catch {
+        return null;
+    }
+}
+
 // [GET] /health: 서비스 상태 확인
 app.get('/health', (req, res) => {
     res.json({
@@ -31,13 +46,22 @@ app.get('/health', (req, res) => {
 // [POST] /mentorings/start: 새로운 멘토링 시작
 app.post('/mentorings/start', async (req, res) => {
     try {
-        const { title, userId, isGroup = true } = req.body ?? {};
+        const { title, isGroup = true } = req.body ?? {};
+        const userId = parseUserIdFromRequest(req);
 
-        if (!title || !userId) {
+        if (!title) {
             return res.status(400).json({
-                message: '제목과 사용자 ID는 필수입니다'
+                message: '제목은 필수입니다.'
             });
         }
+
+        if (userId === null) {
+            return res.status(400).json({
+                message: 'x-user-id 헤더가 필요합니다.'
+            });
+        }
+
+        await mentoringRepository.assertMentorUser(userId);
 
         const mentoring = await mentoringRepository.createMentoring({
             title,
@@ -51,12 +75,18 @@ app.post('/mentorings/start', async (req, res) => {
         return res.status(201).json({
             mentoring,
             signaling: {
-                wsPath: '/ws',
-                hint: '멘토링 세션에 참여하려면 WebSocket을 통해 연결하세요'
+                socketPath: '/socket.io',
+                hint: '멘토링 세션에 참여하려면 Socket.IO를 통해 연결하세요'
             }
         });
     } catch (error) {
         console.error('[mentoring/start] failed', error);
+        const statusCode = error?.statusCode ?? 500;
+
+        if (statusCode !== 500) {
+            return res.status(statusCode).json({ message: error.message });
+        }
+
         return res.status(500).json({
             message: '멘토링 세션을 시작하는 데 실패했습니다'
         });

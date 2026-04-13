@@ -114,14 +114,14 @@ export class MediaSoupOrchestrator {
         const room = await this.ensureRoom(mentoringId);
 
         if (room.peers.has(peerId)) {
-            throw new Error(`Peer ${peerId} already joined`);
+            throw new Error(`Peer ${peerId}은 이미 방에 존재합니다.`);
         }
 
         if (role === 'mentor') {
             const mentorExists = [...room.peers.values()].some((peer) => peer.role === 'mentor');
 
             if (mentorExists) {
-                throw new Error('This mentoring room already has a mentor');
+                throw new Error('이 멘토링은 이미 멘토가 있습니다.');
             }
         }
 
@@ -167,7 +167,7 @@ export class MediaSoupOrchestrator {
         const peer = room?.peers.get(peerId);
 
         if (!room || !peer) {
-            throw new Error('Room or peer not found');
+            throw new Error('멘토링 Room이나 Peer를 찾을 수 없습니다.');
         }
 
         const transport = await room.router.createWebRtcTransport(DEFAULT_TRANSPORT_OPTIONS);
@@ -205,15 +205,15 @@ export class MediaSoupOrchestrator {
         const peer = room?.peers.get(peerId);
 
         if (!room || !peer) {
-            throw new Error('Room or peer not found');
+            throw new Error('멘토링 Room이나 Peer를 찾을 수 없습니다.');
         }
 
         if (peer.role === 'mentee') {
-            throw new Error('Mentee cannot produce media in 1:N mentoring');
+            throw new Error('멘티는 1:N 멘토링에서 미디어를 송출할 수 없습니다.');
         }
 
         if (peer.role === 'tts-bot' && kind !== 'audio') {
-            throw new Error('tts-bot role can only produce audio');
+            throw new Error('tts-bot role은 오디오 미디어만 송출할 수 있습니다.');
         }
 
         const transport = this.getPeerTransport({ mentoringId, peerId, transportId });
@@ -246,11 +246,11 @@ export class MediaSoupOrchestrator {
         const peer = room?.peers.get(peerId);
 
         if (!room || !peer) {
-            throw new Error('Room or peer not found');
+            throw new Error('멘토링 Room이나 Peer를 찾을 수 없습니다.');
         }
 
         if (!room.router.canConsume({ producerId, rtpCapabilities })) {
-            throw new Error('Client cannot consume this producer');
+            throw new Error('클라이언트는 이 Producer를 Consume할 수 없습니다.');
         }
 
         const transport = this.getPeerTransport({ mentoringId, peerId, transportId });
@@ -287,13 +287,13 @@ export class MediaSoupOrchestrator {
         const peer = room?.peers.get(peerId);
 
         if (!room || !peer) {
-            throw new Error('Room or peer not found');
+            throw new Error('멘토링 Room이나 Peer를 찾을 수 없습니다.');
         }
 
         const consumer = peer.consumers.get(consumerId);
 
         if (!consumer) {
-            throw new Error(`Consumer ${consumerId} not found`);
+            throw new Error(`Consumer ${consumerId}를 찾을 수 없습니다.`);
         }
 
         await consumer.resume();
@@ -354,7 +354,7 @@ export class MediaSoupOrchestrator {
         const transport = peer?.transports.get(transportId);
 
         if (!transport) {
-            throw new Error(`Transport ${transportId} not found`);
+            throw new Error(`Transport ${transportId}를 찾을 수 없습니다.`);
         }
 
         return transport;
