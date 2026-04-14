@@ -61,9 +61,12 @@ export default function PrivateMentoringPage() {
       
       {/* 상단 헤더 */}
       <header className="w-full px-5 py-3 flex items-center justify-between shrink-0 bg-white z-30 shadow-sm relative">
+        {/* 💡 수정된 뒤로가기 버튼: 채팅 모드에서만 나타나며, 중앙 정렬이 깨지지 않도록 투명도로 조절합니다. */}
         <button 
-          onClick={() => isChatMode ? setIsChatMode(false) : window.history.back()} 
-          className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+          onClick={() => setIsChatMode(false)} 
+          className={`p-1 hover:bg-gray-100 rounded-full transition-all duration-300
+            ${isChatMode ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'}
+          `}
         >
           <img src="/icons/arrow.svg" alt="화살표 아이콘" className="w-5 h-5 text-[#FFCC00]" />
         </button>
@@ -88,8 +91,6 @@ export default function PrivateMentoringPage() {
             ========================================== */}
         <div className="absolute top-3.5 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center pointer-events-none">
           
-          {/* 마이크 사용 중지 팝업 */}
-          {/* 💡 핵심 수정: overflow-hidden을 제거하여 그림자가 잘리지 않게 하고, mb-2를 조건부로 주어 간격을 조절합니다. */}
           <div className={`transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] origin-top flex justify-center
             ${!isMicOn ? 'max-h-14 opacity-100 scale-100 translate-y-0 mb-2' : 'max-h-0 opacity-0 scale-95 -translate-y-2 mb-0'}
           `}>
@@ -99,7 +100,6 @@ export default function PrivateMentoringPage() {
             </div>
           </div>
 
-          {/* 스피커 사용 중지 팝업 */}
           <div className={`transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] origin-top flex justify-center
             ${!isSpeakerOn ? 'max-h-14 opacity-100 scale-100 translate-y-0 mb-2' : 'max-h-0 opacity-0 scale-95 -translate-y-2 mb-0'}
           `}>
