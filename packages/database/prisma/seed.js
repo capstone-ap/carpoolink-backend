@@ -122,6 +122,38 @@ async function main() {
             },
         });
     }
+
+    // 테스트용 멘토 유저
+    const mentor = await prisma.user.upsert({
+        where: { email: "mentor@test.com" },
+        update: {},
+        create: {
+            email: "mentor@test.com",
+            nickname: "테스트멘토",
+            role: "MENTOR",
+        },
+    });
+
+    // 테스트용 멘티 유저
+    const mentee = await prisma.user.upsert({
+        where: { email: "mentee@test.com" },
+        update: {},
+        create: {
+            email: "mentee@test.com",
+            nickname: "테스트멘티",
+            role: "MENTEE",
+        },
+    });
+
+    // 테스트용 멘토링 세션 (호스트는 멘토)
+    const mentoring = await prisma.mentoring.create({
+        data: {
+            title: "테스트 멘토링",
+            isGroup: false,
+            status: "READY",
+            userId: mentor.userId,
+        },
+    });
 }
 
 main()
