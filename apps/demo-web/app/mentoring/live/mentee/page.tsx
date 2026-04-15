@@ -79,7 +79,7 @@ export default function LiveMentoringPage() {
       
       {/* 상단 네비게이션 */}
       <header className="w-full px-5 py-4 flex items-center justify-between shrink-0 z-10">
-        <Link href="/" className="inline-flex items-center hover:opacity-80 transition-opacity">
+        <Link href="/mentoring/live" className="inline-flex items-center hover:opacity-80 transition-opacity">
           <img src="/icons/arrow.svg" alt="화살표 아이콘" className="w-5 h-5 mr-2 text-[#FFCC00]" />
           <span className="font-bold text-[17px]">나가기</span>
         </Link>
