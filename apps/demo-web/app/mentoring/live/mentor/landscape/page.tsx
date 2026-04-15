@@ -224,7 +224,7 @@ export default function MentorLandscapeLivePage() {
               <button onClick={() => setIsExitPopupOpen(false)} className="flex-1 bg-gray-800 text-white text-[14px] font-bold py-3 rounded-xl hover:bg-gray-700 transition-colors">
                 취소
               </button>
-              <Link href="/" className="flex-1 bg-red-600 text-white text-[14px] font-bold py-3 rounded-xl hover:bg-red-700 transition-colors text-center">
+              <Link href="/mentoring/live" className="flex-1 bg-red-600 text-white text-[14px] font-bold py-3 rounded-xl hover:bg-red-700 transition-colors text-center">
                 종료
               </Link>
             </div>
