@@ -140,11 +140,23 @@ export default function ScriptEditPage() {
         
         <div className="flex items-center gap-2">
           {/* 💡 onMouseDown 이벤트에 e.preventDefault()를 넣어 버튼 클릭 시 에디터 포커스가 풀리지 않도록 합니다. */}
-          <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleAction('mask')} className="bg-[#1A1A1A] text-white p-2 rounded-lg transition-colors hover:bg-black shadow-sm" title="선택된 영역 마스킹">
+          {/* 마스킹: 짙은 회색 아이콘 */}
+          <button 
+            onMouseDown={(e) => e.preventDefault()} 
+            onClick={() => handleAction('mask')} 
+            className="bg-gray-100 text-[#1A1A1A] active:bg-gray-300 p-2 rounded-lg transition-colors shadow-sm" 
+            title="선택된 영역 마스킹"
+          >
             <EyeOff className="w-4 h-4" />
           </button>
-          
-          <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleAction('erase')} className="bg-red-50 text-red-500 hover:bg-red-100 p-2 rounded-lg transition-colors shadow-sm" title="선택된 영역 마스킹 해제">
+
+          {/* 지우기: 빨간색 아이콘으로 포인트 */}
+          <button 
+            onMouseDown={(e) => e.preventDefault()} 
+            onClick={() => handleAction('erase')} 
+            className="bg-gray-100 text-[#1A1A1A] active:bg-gray-300 p-2 rounded-lg transition-colors shadow-sm" 
+            title="선택된 영역 마스킹 해제"
+          >
             <Eraser className="w-4 h-4" />
           </button>
 
@@ -196,7 +208,8 @@ export default function ScriptEditPage() {
             </div>
             <h3 className="text-[19px] font-extrabold text-center mb-3">정말 발행하시겠습니까?</h3>
             <p className="text-gray-500 text-[13px] text-center mb-8 leading-relaxed">
-              발행 시 멘티에게 알림이 전송됩니다. 마스킹 처리가 완벽한지 다시 한 번 확인해 주세요.
+              발행 시 멘티에게 알림이 전송됩니다.<br />
+              마스킹 처리가 완벽한지 다시 한 번 확인해 주세요.
             </p>
             <div className="flex gap-3 w-full">
               <button onClick={() => setIsPublishPopupOpen(false)} className="flex-1 bg-[#F2F4F6] text-gray-600 font-bold py-3.5 rounded-xl transition-all hover:bg-gray-200 active:scale-95">취소</button>
