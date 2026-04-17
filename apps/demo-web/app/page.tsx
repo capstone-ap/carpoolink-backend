@@ -25,7 +25,7 @@ export default function Home() {
           📺 1:N 라이브 멘토링 UI
         </Link>
 
-        <Link href="/mentor/script" className="px-6 py-4 bg-zinc-800 border border-zinc-700 rounded-xl hover:bg-zinc-700 transition-colors text-center font-bold">
+        <Link href="/script/100" className="px-6 py-4 bg-zinc-800 border border-zinc-700 rounded-xl hover:bg-zinc-700 transition-colors text-center font-bold">
           ✂️ 스크립트 수정 UI
         </Link>
 
