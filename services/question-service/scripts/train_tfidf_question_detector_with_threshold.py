@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+import pickle
 from pathlib import Path
 
 import numpy as np
@@ -10,15 +12,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.pipeline import Pipeline
 
+from question_detection_rules import classify_question_by_rules, export_rule_config
 
-# =========================================================
-# 인자 파싱
-# =========================================================
+
 def parse_args() -> argparse.Namespace:
-    """
-    TF-IDF + Logistic Regression 기반 질문 탐지 모델을 학습하고,
-    validation set에서 threshold를 탐색하기 위한 인자를 정의한다.
-    """
     parser = argparse.ArgumentParser(
         description="Train TF-IDF question detector and find best threshold on validation set."
     )
@@ -101,33 +98,37 @@ def parse_args() -> argparse.Namespace:
         help="Metric to optimize on validation set",
     )
     parser.add_argument(
-        "--error-sample-size",
+        "--save-sample-size",
         type=int,
         default=200,
-        help="Number of FP/FN samples to save",
+        help="Number of representative FP/FN samples to save separately",
+    )
+    parser.add_argument(
+        "--disable-rule-filter",
+        action="store_true",
+        help="Disable rule-based pre-filter and use model-only predictions",
+    )
+    parser.add_argument(
+        "--model-filename",
+        type=str,
+        default="question_detector_pipeline.pkl",
+        help="Filename for serialized sklearn pipeline",
+    )
+    parser.add_argument(
+        "--artifact-filename",
+        type=str,
+        default="question_detector_artifact.pkl",
+        help="Filename for serialized inference artifact",
     )
     return parser.parse_args()
 
 
-# =========================================================
-# 데이터 로드
-# =========================================================
 def load_dataset(path: str) -> pd.DataFrame:
-    """
-    전처리 완료된 split csv를 로드한다.
-    사용 컬럼:
-    - text
-    - text_preprocessed
-    - label
-    """
     df = pd.read_csv(path)
     df = df[["text", "text_preprocessed", "label"]].copy()
     return df
 
 
-# =========================================================
-# 모델 생성
-# =========================================================
 def build_pipeline(
     max_features: int,
     ngram_max: int,
@@ -135,12 +136,9 @@ def build_pipeline(
     max_iter: int,
     use_class_weight: bool,
 ) -> Pipeline:
-    """
-    TF-IDF + Logistic Regression 파이프라인 생성
-    """
     class_weight = "balanced" if use_class_weight else None
 
-    pipeline = Pipeline(
+    return Pipeline(
         steps=[
             (
                 "tfidf",
@@ -162,17 +160,9 @@ def build_pipeline(
             ),
         ]
     )
-    return pipeline
 
 
-# =========================================================
-# 평가 지표 계산
-# =========================================================
 def calculate_binary_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-    """
-    이진 분류 결과에 대해 precision / recall / f1 / accuracy를 계산한다.
-    질문 클래스(label=1)를 기준으로 계산한다.
-    """
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
 
@@ -202,9 +192,6 @@ def calculate_binary_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     }
 
 
-# =========================================================
-# threshold 탐색
-# =========================================================
 def search_best_threshold(
     y_true: np.ndarray,
     y_prob: np.ndarray,
@@ -212,13 +199,8 @@ def search_best_threshold(
     threshold_end: float,
     threshold_step: float,
     optimize_metric: str,
-) -> tuple[float, pd.DataFrame]:
-    """
-    validation set에서 threshold sweep을 수행하고,
-    지정한 metric 기준으로 최적 threshold를 찾는다.
-    """
+) -> tuple[float, pd.DataFrame, pd.DataFrame]:
     rows = []
-
     thresholds = np.arange(
         threshold_start,
         threshold_end + 1e-9,
@@ -228,103 +210,66 @@ def search_best_threshold(
     for threshold in thresholds:
         y_pred = (y_prob >= threshold).astype(int)
         metrics = calculate_binary_metrics(y_true, y_pred)
+        rows.append({"threshold": round(float(threshold), 4), **metrics})
 
-        row = {
-            "threshold": round(float(threshold), 4),
-            **metrics,
-        }
-        rows.append(row)
-
-    result_df = pd.DataFrame(rows)
-
-    # 동률일 경우 보통 threshold가 너무 낮아 과도하게 질문으로 잡는 걸 막기 위해
-    # precision을 2차 기준으로, threshold를 3차 기준으로 본다.
-    result_df = result_df.sort_values(
+    raw_df = pd.DataFrame(rows)
+    sorted_df = raw_df.sort_values(
         by=[optimize_metric, "precision", "threshold"],
         ascending=[False, False, False],
     ).reset_index(drop=True)
+    best_threshold = float(sorted_df.iloc[0]["threshold"])
+    return best_threshold, sorted_df, raw_df
 
-    best_threshold = float(result_df.iloc[0]["threshold"])
-    return best_threshold, result_df
 
-
-# =========================================================
-# 문자열 저장
-# =========================================================
 def save_text(path: Path, text: str) -> None:
-    """
-    텍스트 파일 저장
-    """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8-sig")
 
 
-# =========================================================
-# split 평가 및 저장
-# =========================================================
-def evaluate_with_threshold(
+def format_confusion_matrix(cm: np.ndarray) -> str:
+    return (
+        "         pred_0  pred_1\n"
+        f"true_0   {cm[0, 0]:7d} {cm[0, 1]:7d}\n"
+        f"true_1   {cm[1, 0]:7d} {cm[1, 1]:7d}\n"
+    )
+
+
+def predict_prob_with_rule_filter(
     model: Pipeline,
     df: pd.DataFrame,
+    use_rule_filter: bool,
+) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    base_prob = model.predict_proba(df["text_preprocessed"])[:, 1]
+
+    if not use_rule_filter:
+        return base_prob, base_prob.copy(), ["model"] * len(df)
+
+    final_prob = base_prob.copy()
+    decision_sources = ["model"] * len(df)
+
+    for index, text in enumerate(df["text"].astype(str).tolist()):
+        rule_label, rule_reason = classify_question_by_rules(text)
+        if rule_label is None:
+            continue
+
+        final_prob[index] = 1.0 if rule_label == 1 else 0.0
+        decision_sources[index] = rule_reason
+
+    return base_prob, final_prob, decision_sources
+
+
+def save_error_files(
+    result_df: pd.DataFrame,
     split_name: str,
-    threshold: float,
     output_dir: Path,
-    error_sample_size: int,
+    save_sample_size: int,
 ) -> None:
-    """
-    특정 split에 대해 score(probability)를 뽑고,
-    threshold를 적용한 결과를 평가/저장한다.
-    """
-    x = df["text_preprocessed"]
-    y_true = df["label"].to_numpy()
-
-    # 질문(label=1) 확률 점수
-    y_prob = model.predict_proba(x)[:, 1]
-
-    # threshold 적용
-    y_pred = (y_prob >= threshold).astype(int)
-
-    # 텍스트 리포트
-    report = classification_report(
-        y_true,
-        y_pred,
-        digits=4,
-        zero_division=0,
-    )
-    cm = confusion_matrix(y_true, y_pred)
-
-    print(f"\n===== [{split_name.upper()} @ threshold={threshold:.2f}] =====")
-    print(report)
-    print(cm)
-
-    save_text(
-        output_dir / f"{split_name}_classification_report.txt",
-        report,
-    )
-    save_text(
-        output_dir / f"{split_name}_confusion_matrix.txt",
-        str(cm),
-    )
-
-    # score 포함 결과 저장
-    result_df = df.copy()
-    result_df["score"] = y_prob
-    result_df["pred"] = y_pred
-    result_df["correct"] = (result_df["label"] == result_df["pred"]).astype(int)
-
-    result_df.to_csv(
-        output_dir / f"{split_name}_predictions_with_scores.csv",
-        index=False,
-        encoding="utf-8-sig",
-    )
-
-    # 오분류 샘플 저장
     error_df = result_df[result_df["correct"] == 0].copy()
-
     fn_df = error_df[(error_df["label"] == 1) & (error_df["pred"] == 0)].copy()
     fp_df = error_df[(error_df["label"] == 0) & (error_df["pred"] == 1)].copy()
 
-    fn_df = fn_df.sort_values(by="score", ascending=True).head(error_sample_size)
-    fp_df = fp_df.sort_values(by="score", ascending=False).head(error_sample_size)
+    fn_df = fn_df.sort_values(by="score", ascending=True)
+    fp_df = fp_df.sort_values(by="score", ascending=False)
 
     fn_df.to_csv(
         output_dir / f"{split_name}_false_negative_samples.csv",
@@ -337,24 +282,134 @@ def evaluate_with_threshold(
         encoding="utf-8-sig",
     )
 
+    fn_df.head(save_sample_size).to_csv(
+        output_dir / f"{split_name}_false_negative_samples_topk.csv",
+        index=False,
+        encoding="utf-8-sig",
+    )
+    fp_df.head(save_sample_size).to_csv(
+        output_dir / f"{split_name}_false_positive_samples_topk.csv",
+        index=False,
+        encoding="utf-8-sig",
+    )
 
-# =========================================================
-# 메인
-# =========================================================
+
+def evaluate_with_threshold(
+    model: Pipeline,
+    df: pd.DataFrame,
+    split_name: str,
+    threshold: float,
+    output_dir: Path,
+    save_sample_size: int,
+    use_rule_filter: bool,
+) -> None:
+    y_true = df["label"].to_numpy()
+    base_prob, y_prob, decision_sources = predict_prob_with_rule_filter(
+        model=model,
+        df=df,
+        use_rule_filter=use_rule_filter,
+    )
+    y_pred = (y_prob >= threshold).astype(int)
+
+    report = classification_report(
+        y_true,
+        y_pred,
+        digits=4,
+        zero_division=0,
+    )
+    cm = confusion_matrix(y_true, y_pred)
+
+    print(f"\n===== [{split_name.upper()} @ threshold={threshold:.2f}] =====")
+    print(report)
+    print(cm)
+
+    save_text(output_dir / f"{split_name}_classification_report.txt", report)
+    save_text(output_dir / f"{split_name}_confusion_matrix.txt", format_confusion_matrix(cm))
+
+    result_df = df.copy()
+    result_df["base_model_score"] = base_prob
+    result_df["score"] = y_prob
+    result_df["pred"] = y_pred
+    result_df["correct"] = (result_df["label"] == result_df["pred"]).astype(int)
+    result_df["decision_source"] = decision_sources
+
+    result_df.to_csv(
+        output_dir / f"{split_name}_predictions_with_scores.csv",
+        index=False,
+        encoding="utf-8-sig",
+    )
+
+    decision_source_df = (
+        pd.Series(decision_sources, name="decision_source")
+        .value_counts()
+        .rename_axis("decision_source")
+        .reset_index(name="count")
+    )
+    decision_source_df["ratio"] = (decision_source_df["count"] / len(df)).round(4)
+    decision_source_df.to_csv(
+        output_dir / f"{split_name}_decision_source_counts.csv",
+        index=False,
+        encoding="utf-8-sig",
+    )
+
+    save_error_files(
+        result_df=result_df,
+        split_name=split_name,
+        output_dir=output_dir,
+        save_sample_size=save_sample_size,
+    )
+
+
+def save_model_artifacts(
+    model: Pipeline,
+    best_threshold: float,
+    output_dir: Path,
+    args: argparse.Namespace,
+    use_rule_filter: bool,
+) -> None:
+    pipeline_path = output_dir / args.model_filename
+    artifact_path = output_dir / args.artifact_filename
+    config_path = output_dir / "inference_config.json"
+
+    with pipeline_path.open("wb") as file:
+        pickle.dump(model, file)
+
+    artifact = {
+        "model": model,
+        "best_threshold": best_threshold,
+        "use_rule_filter": use_rule_filter,
+        "rule_config": export_rule_config(),
+        "train_args": {
+            "max_features": args.max_features,
+            "ngram_max": args.ngram_max,
+            "c_value": args.c_value,
+            "max_iter": args.max_iter,
+            "use_class_weight": args.use_class_weight,
+            "optimize_metric": args.optimize_metric,
+        },
+    }
+    with artifact_path.open("wb") as file:
+        pickle.dump(artifact, file)
+
+    config = {
+        "best_threshold": round(best_threshold, 4),
+        "use_rule_filter": use_rule_filter,
+        "model_filename": args.model_filename,
+        "artifact_filename": args.artifact_filename,
+        "rule_config": export_rule_config(),
+    }
+    config_path.write_text(
+        json.dumps(config, ensure_ascii=False, indent=2),
+        encoding="utf-8-sig",
+    )
+
+
 def main() -> None:
-    """
-    전체 실행 흐름:
-    1. train 학습
-    2. valid에서 확률(score) 추출
-    3. threshold sweep
-    4. best threshold 선택
-    5. valid/test 평가 및 저장
-    """
     args = parse_args()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    use_rule_filter = not args.disable_rule_filter
 
-    # 데이터 로드
     train_df = load_dataset(args.train_path)
     valid_df = load_dataset(args.valid_path)
     test_df = load_dataset(args.test_path)
@@ -363,8 +418,8 @@ def main() -> None:
     print("[INFO] valid size:", len(valid_df))
     print("[INFO] test size :", len(test_df))
     print("[INFO] use_class_weight:", args.use_class_weight)
+    print("[INFO] use_rule_filter:", use_rule_filter)
 
-    # 모델 생성 및 학습
     model = build_pipeline(
         max_features=args.max_features,
         ngram_max=args.ngram_max,
@@ -377,12 +432,14 @@ def main() -> None:
     model.fit(train_df["text_preprocessed"], train_df["label"])
     print("[INFO] Training completed.")
 
-    # validation 점수 추출
-    valid_prob = model.predict_proba(valid_df["text_preprocessed"])[:, 1]
+    _, valid_prob, _ = predict_prob_with_rule_filter(
+        model=model,
+        df=valid_df,
+        use_rule_filter=use_rule_filter,
+    )
     valid_true = valid_df["label"].to_numpy()
 
-    # threshold 탐색
-    best_threshold, threshold_df = search_best_threshold(
+    best_threshold, threshold_sorted_df, threshold_raw_df = search_best_threshold(
         y_true=valid_true,
         y_prob=valid_prob,
         threshold_start=args.threshold_start,
@@ -393,38 +450,55 @@ def main() -> None:
 
     print(f"\n[INFO] Best threshold on valid ({args.optimize_metric}): {best_threshold:.2f}")
 
-    # threshold 탐색 결과 저장
-    threshold_df.to_csv(
-        output_dir / "threshold_search_results.csv",
+    threshold_sorted_df.to_csv(
+        output_dir / "threshold_search_results_sorted.csv",
+        index=False,
+        encoding="utf-8-sig",
+    )
+    threshold_raw_df.to_csv(
+        output_dir / "threshold_search_results_raw.csv",
         index=False,
         encoding="utf-8-sig",
     )
 
     save_text(
         output_dir / "best_threshold.txt",
-        f"best_threshold={best_threshold:.4f}\noptimize_metric={args.optimize_metric}\n",
+        (
+            f"best_threshold={best_threshold:.4f}\n"
+            f"optimize_metric={args.optimize_metric}\n"
+            f"use_class_weight={args.use_class_weight}\n"
+            f"use_rule_filter={use_rule_filter}\n"
+        ),
     )
 
-    # valid/test 평가
+    save_model_artifacts(
+        model=model,
+        best_threshold=best_threshold,
+        output_dir=output_dir,
+        args=args,
+        use_rule_filter=use_rule_filter,
+    )
+
     evaluate_with_threshold(
         model=model,
         df=valid_df,
         split_name="valid",
         threshold=best_threshold,
         output_dir=output_dir,
-        error_sample_size=args.error_sample_size,
+        save_sample_size=args.save_sample_size,
+        use_rule_filter=use_rule_filter,
     )
-
     evaluate_with_threshold(
         model=model,
         df=test_df,
         split_name="test",
         threshold=best_threshold,
         output_dir=output_dir,
-        error_sample_size=args.error_sample_size,
+        save_sample_size=args.save_sample_size,
+        use_rule_filter=use_rule_filter,
     )
 
-    print("\n[DONE] Threshold search and evaluation completed.")
+    print("\n[DONE] Threshold search, artifact save, and evaluation completed.")
 
 
 if __name__ == "__main__":

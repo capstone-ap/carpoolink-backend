@@ -20,6 +20,8 @@ data/interim/question_detection/candidate/*.csv
 
 # Optional: ignore extracted raw working files if not tracked by DVC
 data/interim/question_detection/extracted/
+services/question-service/outputs/question_detection/error_analysis/
+services/question-service/outputs/question_detection/error_analysis_smoke/
 
 # OS / editor
 .DS_Store
