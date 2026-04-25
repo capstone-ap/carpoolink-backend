@@ -1,0 +1,6 @@
+outs:
+- md5: ab06a32b6471b479633410cdda68686f.dir
+  size: 93699585
+  nfiles: 12
+  hash: md5
+  path: tfidf_lr_threshold

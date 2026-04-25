@@ -1,0 +1,4 @@
+[core]
+    remote = carpoolink
+['remote "carpoolink"']
+    url = s3://capstone2026-carpoolink-dvc

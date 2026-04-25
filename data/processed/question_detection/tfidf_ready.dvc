@@ -1,0 +1,6 @@
+outs:
+- md5: bc12d7e968b5a10a88c042d329727007.dir
+  size: 392420781
+  nfiles: 3
+  hash: md5
+  path: tfidf_ready
