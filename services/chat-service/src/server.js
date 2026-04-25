@@ -1,8 +1,11 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { initializeRedis, redisClient } from './redis/redisClient.js';
-import { handleConnection } from './socket/socketHandler.js';
+import {
+    handleConnection,
+    closeCompletedMentoringRooms,
+    closeMentoringRoom,
+} from './socket/socketHandler.js';
 import chatsRouter from './routes/chats.js';
 import { PrismaClient } from '@carpoolink/database';
 
@@ -41,15 +44,19 @@ io.on('connection', (socket) => {
     handleConnection(socket, io);
 });
 
-// Redis 클라이언트 초기화 및 서버 시작
+let roomLifecycleTimer = null;
+
+// 서버 시작
 async function startServer() {
     try {
-        await initializeRedis();
-        console.log('✓ Redis connected');
-
         httpServer.listen(PORT, () => {
             console.log(`✓ chat-service running on http://localhost:${PORT}`);
         });
+
+        // 단일 서버 환경: 활성 룸의 멘토링 상태를 주기적으로 확인해 완료 시 강제 종료
+        roomLifecycleTimer = setInterval(async () => {
+            await closeCompletedMentoringRooms(io);
+        }, 5000);
     } catch (error) {
         console.error('✗ Failed to start chat-service:', error);
         process.exit(1);
@@ -59,7 +66,21 @@ async function startServer() {
 // 종료 이벤트 처리
 process.on('SIGTERM', async () => {
     console.log('SIGTERM received, shutting down gracefully...');
-    await redisClient.disconnect();
+
+    if (roomLifecycleTimer) {
+        clearInterval(roomLifecycleTimer);
+        roomLifecycleTimer = null;
+    }
+
+    // 종료 시 활성 룸 모두 닫기
+    const rooms = Array.from(io.sockets.adapter.rooms.keys())
+        .filter((roomName) => roomName.startsWith('mentoring:'));
+
+    for (const roomName of rooms) {
+        const mentoringId = roomName.replace('mentoring:', '');
+        await closeMentoringRoom(io, mentoringId, 'SERVER_SHUTDOWN');
+    }
+
     await global.prisma.$disconnect();
     httpServer.close(() => {
         process.exit(0);
