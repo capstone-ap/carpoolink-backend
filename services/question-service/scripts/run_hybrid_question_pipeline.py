@@ -18,6 +18,11 @@ SAFE_NEGATIVE_RULE_REASONS = {
     "rule_statement_ending",
 }
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+SERVICE_ROOT = SCRIPT_DIR.parent
+CARPOOLINK_ROOT = SERVICE_ROOT.parent.parent
+REPO_ROOT = CARPOOLINK_ROOT.parent
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -88,6 +93,11 @@ def load_kc_electra_pipeline(model_dir: Path):
     model_dir = resolve_kc_electra_dir(model_dir)
     config = json.loads((model_dir / "inference_config.json").read_text(encoding="utf-8-sig"))
     local_model_dir = Path(config["local_model_dir"])
+    if not local_model_dir.is_absolute():
+        if local_model_dir.parts and local_model_dir.parts[0].lower() == "carpoolink":
+            local_model_dir = REPO_ROOT.joinpath(*local_model_dir.parts)
+        else:
+            local_model_dir = (REPO_ROOT / local_model_dir).resolve()
     tokenizer = AutoTokenizer.from_pretrained(str(local_model_dir))
     model = AutoModelForSequenceClassification.from_pretrained(str(local_model_dir))
     clf = pipeline(
