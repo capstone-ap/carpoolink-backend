@@ -21,13 +21,13 @@ export default function WithNavLayout({ children }: { children: React.ReactNode 
         </Link>
 
         {/* 1:N 멘토링 (다수 인원 느낌의 Users 아이콘 사용) */}
-        <Link href="#" className="flex flex-col items-center justify-center p-2 flex-1 hover:text-gray-900 transition-colors">
+        <Link href="/mentoring_list/live_list" className="flex flex-col items-center justify-center p-2 flex-1 hover:text-gray-900 transition-colors">
           <Users className="w-6 h-6 mb-1" strokeWidth={2} />
           <span className="text-[11px] font-bold tracking-tight whitespace-nowrap">1:N 멘토링</span>
         </Link>
 
         {/* 1:1 멘토링 (개인 대 개인 느낌의 UserCircle 아이콘 사용) */}
-        <Link href="#" className="flex flex-col items-center justify-center p-2 flex-1 hover:text-gray-900 transition-colors">
+        <Link href="/mentoring_list/1on1_list" className="flex flex-col items-center justify-center p-2 flex-1 hover:text-gray-900 transition-colors">
           <UserCircle className="w-6 h-6 mb-1" strokeWidth={2} />
           <span className="text-[11px] font-bold tracking-tight whitespace-nowrap">1:1 멘토링</span>
         </Link>
