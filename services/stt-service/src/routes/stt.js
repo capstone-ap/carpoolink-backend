@@ -2,6 +2,8 @@ import { Router } from "express";
 import multer from "multer";
 import { transcribeAudio } from "../services/whisper.js";
 import { saveScript } from "../services/scriptSave.js";
+import { splitAudioIntoChunks } from "../services/audioChunk.js";
+import { prisma } from "@carpoolink/database";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() }); // 파일을 메모리에 임시 저장
@@ -56,6 +58,86 @@ router.post("/chunk", upload.single("audio"), async (req, res) => {
     });
   } catch (err) {
     console.error("[STT ERROR]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+//긴 오디오 파일 업로드 → 청크 분할 → STT → DB 저장
+router.post("/upload", upload.single("audio"), async (req, res) => {
+  try {
+    const { userId, mentoringId } = req.body;
+
+    if (!req.file || !userId || !mentoringId) {
+      return res.status(400).json({ error: "audio, userId, mentoringId는 필수입니다." });
+    }
+
+    // 1. 청크 분할
+    const chunks = await splitAudioIntoChunks(req.file.buffer, req.file.mimetype);
+
+    // 2. 각 청크 STT + DB 저장
+    const results = [];
+    for (const chunk of chunks) {
+      const audioFile = new File(
+        [chunk.buffer],
+        `chunk_${chunk.index}.wav`,
+        { type: req.file.mimetype }
+      );
+
+      const text = await transcribeAudio(audioFile);
+
+      const saved = await saveScript(
+        { text, chunkIndex: chunk.index, startTime: chunk.startTime, endTime: chunk.endTime },
+        { userId, mentoringId }
+      );
+
+      results.push({
+        scriptId: saved.scriptId.toString(),
+        chunkIndex: chunk.index,
+        startTime: chunk.startTime,
+        endTime: chunk.endTime,
+        text,
+      });
+    }
+
+    res.json({ mentoringId, totalChunks: chunks.length, scripts: results });
+  } catch (err) {
+    console.error("[STT UPLOAD ERROR]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+//mentoringId로 전체 스크립트 조회
+router.get("/script/:mentoringId", async (req, res) => {
+  try {
+    const { mentoringId } = req.params;
+
+    const scripts = await prisma.script.findMany({
+      where: { mentoringId: BigInt(mentoringId) },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (scripts.length === 0) {
+      return res.status(404).json({ error: "해당 멘토링의 스크립트가 없습니다." });
+    }
+
+    // chunkIndex 순으로 정렬 후 텍스트 이어붙이기
+    const sorted = scripts.sort((a, b) => a.content.chunkIndex - b.content.chunkIndex);
+    const fullText = sorted.map((s) => s.content.text).join(" ");
+
+    res.json({
+      mentoringId,
+      totalChunks: scripts.length,
+      fullText,
+      chunks: sorted.map((s) => ({
+        scriptId: s.scriptId.toString(),
+        chunkIndex: s.content.chunkIndex,
+        startTime: s.content.startTime,
+        endTime: s.content.endTime,
+        text: s.content.text,
+      })),
+    });
+  } catch (err) {
+    console.error("[STT SCRIPT ERROR]", err);
     res.status(500).json({ error: err.message });
   }
 });
