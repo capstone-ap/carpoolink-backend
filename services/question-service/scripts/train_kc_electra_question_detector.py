@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import time
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +16,7 @@ from transformers import (
     DataCollatorWithPadding,
     Trainer,
     TrainingArguments,
+    TrainerCallback,
 )
 
 from preprocess_question_detection_for_tfidf import normalize_for_tfidf
@@ -21,7 +24,6 @@ from train_tfidf_question_detector_with_threshold import (
     calculate_binary_metrics,
     search_best_threshold,
 )
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -260,6 +262,67 @@ def save_prediction_outputs(
     metrics["threshold"] = threshold
     return metrics
 
+class ConsoleProgressCallback(TrainerCallback):
+    def __init__(self):
+        self.train_start_time = None
+        self.last_log_time = None
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        self.train_start_time = time.time()
+        self.last_log_time = self.train_start_time
+        print(
+            f"[TRAIN START] total_steps={state.max_steps}, "
+            f"epochs={args.num_train_epochs}, "
+            f"train_batch_size={args.per_device_train_batch_size}, "
+            f"grad_accum={args.gradient_accumulation_steps}"
+        )
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if not logs:
+            return
+
+        now = time.time()
+        elapsed = now - self.train_start_time if self.train_start_time else 0.0
+        current_step = max(1, state.global_step)
+        total_steps = max(1, state.max_steps)
+
+        pct = (current_step / total_steps) * 100.0
+        sec_per_step = elapsed / current_step
+        eta_sec = max(0.0, (total_steps - current_step) * sec_per_step)
+
+        def fmt(sec: float) -> str:
+            sec = int(sec)
+            h = sec // 3600
+            m = (sec % 3600) // 60
+            s = sec % 60
+            if h > 0:
+                return f"{h:02d}:{m:02d}:{s:02d}"
+            return f"{m:02d}:{s:02d}"
+
+        loss_str = f"{logs['loss']:.4f}" if "loss" in logs else "-"
+        lr_str = f"{logs['learning_rate']:.8f}" if "learning_rate" in logs else "-"
+
+        print(
+            f"[PROGRESS] step={current_step}/{total_steps} "
+            f"({pct:.2f}%) | loss={loss_str} | lr={lr_str} | "
+            f"elapsed={fmt(elapsed)} | eta={fmt(eta_sec)}"
+        )
+
+        self.last_log_time = now
+
+    def on_train_end(self, args, state, control, **kwargs):
+        total = time.time() - self.train_start_time if self.train_start_time else 0.0
+
+        def fmt(sec: float) -> str:
+            sec = int(sec)
+            h = sec // 3600
+            m = (sec % 3600) // 60
+            s = sec % 60
+            if h > 0:
+                return f"{h:02d}:{m:02d}:{s:02d}"
+            return f"{m:02d}:{s:02d}"
+
+        print(f"[TRAIN END] total_elapsed={fmt(total)}")
 
 def main() -> None:
     args = parse_args()
@@ -321,6 +384,7 @@ def main() -> None:
         fp16=args.use_fp16,
         bf16=args.use_bf16,
         gradient_checkpointing=args.gradient_checkpointing,
+        disable_tqdm=False,   # 추가
     )
 
     trainer = Trainer(
@@ -330,6 +394,7 @@ def main() -> None:
         eval_dataset=valid_ds,
         processing_class=tokenizer,
         data_collator=data_collator,
+        callbacks=[ConsoleProgressCallback()],   # 추가
     )
 
     print("\n[INFO] Training KC-ELECTRA...")

@@ -1,9 +1,24 @@
 Param(
-    [string]$PythonExe = "C:\Users\admin\Desktop\2026 캡스톤디자인\Capstone\venv\Scripts\python.exe",
-    [string]$ProjectRoot = "C:\Users\admin\Desktop\2026 캡스톤디자인\Capstone",
     [string]$ModelName = "beomi/KcELECTRA-base-v2022",
     [string]$OutputDir = "carpoolink/services/model/question_detection/kc_electra_question_detector"
 )
+
+$ErrorActionPreference = "Stop"
+
+# 현재 ps1 파일 위치 기준
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# scripts 폴더 기준으로 4단계 위로 올라가면 Capstone\carpoolink
+$CarpoolinkRoot = (Resolve-Path (Join-Path $ScriptDir "..\..\..")).Path
+$ProjectRoot = (Resolve-Path (Join-Path $CarpoolinkRoot "..")).Path
+
+# 현재 활성화된 venv python 우선 사용
+$PythonExe = (Get-Command python).Source
+
+Write-Host "[INFO] ScriptDir      : $ScriptDir"
+Write-Host "[INFO] CarpoolinkRoot : $CarpoolinkRoot"
+Write-Host "[INFO] ProjectRoot    : $ProjectRoot"
+Write-Host "[INFO] PythonExe      : $PythonExe"
 
 Set-Location $ProjectRoot
 
