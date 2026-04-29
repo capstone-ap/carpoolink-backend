@@ -27,22 +27,22 @@ export default function MyPage() {
 
       {/* 2. 멘티 프로필 영역 */}
       <div className="flex items-center gap-4 px-5 py-6">
-        {/* 멘티 로고 아이콘 (스크린샷 스타일 반영) */}
+        {/* 멘티 로고 아이콘 */}
         <div className="w-[72px] h-[72px] bg-[#111116] rounded-2xl flex flex-col items-center justify-center text-white shrink-0 shadow-sm">
           <span className="text-[15px] font-extrabold mb-1">멘티</span>
           <span className="text-[10px] font-bold tracking-widest">—O—O—</span>
         </div>
         
-        <div className="flex flex-col gap-1.5">
+        {/* 💡 수정됨: flex-col 대신 flex items-center를 사용하여 닉네임과 뱃지를 가로로 배치합니다. */}
+        <div className="flex items-center gap-2">
           <h2 className="text-[20px] font-semibold tracking-tight">김세종</h2>
-          {/* 💡 추가됨: 사전 설문 결과 (유형 이름) */}
-          <span className="inline-block bg-[#FFCC00] text-black-600 text-[12px] font-semibold px-2.5 py-1.5 rounded-md w-fit">
-            탐구하는 개발자
+          <span className="inline-block bg-[#FFCC00] text-black text-[12px] font-semibold px-2.5 py-1 rounded-md w-fit">
+            창의적인 모험가
           </span>
         </div>
       </div>
 
-      {/* 3. 사전 질문권 개수 영역 (스크린샷의 메시지 전송가능 건수 변형) */}
+      {/* 3. 사전 질문권 개수 영역 */}
       <div className="mx-5 mb-8 bg-[#F8F9FA] rounded-2xl p-4 flex items-center justify-between border border-gray-100 shadow-sm">
         <span className="text-[15px] font-bold text-gray-700 ml-1">사전 질문권 개수</span>
         <div className="flex items-center gap-3">
@@ -87,7 +87,6 @@ export default function MyPage() {
           <ChevronRight className="w-5 h-5 text-gray-300" />
         </Link>
 
-        {/* 💡 추가됨: 스크립트 목록 버튼 */}
         <Link href="/mypage/scripts" className="flex items-center justify-between py-4 group">
           <div className="flex items-center gap-3">
             <ScrollText className="w-[22px] h-[22px] text-gray-500 group-hover:text-[#1A1A1A] transition-colors" strokeWidth={2} />
@@ -97,10 +96,10 @@ export default function MyPage() {
         </Link>
       </div>
 
-      {/* 구분선 (스크린샷 스타일 반영) */}
+      {/* 구분선 */}
       <div className="w-full h-[8px] bg-[#F8F9FA]" />
 
-      {/* 5. 서브 메뉴 리스트 (고객센터 등) */}
+      {/* 5. 서브 메뉴 리스트 */}
       <div className="flex flex-col px-5 mt-4">
         <Link href="#" className="flex items-center justify-between py-4 group">
           <div className="flex items-center gap-3">
