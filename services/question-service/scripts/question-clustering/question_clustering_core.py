@@ -1,14 +1,24 @@
 from __future__ import annotations
 
-import argparse
 import json
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPTS_ROOT = SCRIPT_DIR.parent
+QUESTION_DETECTION_DIR = SCRIPTS_ROOT / "question-detection"
+SERVICE_ROOT = SCRIPTS_ROOT.parent
+REPO_ROOT = SERVICE_ROOT.parent.parent
+
+if str(QUESTION_DETECTION_DIR) not in sys.path:
+    sys.path.insert(0, str(QUESTION_DETECTION_DIR))
+
 from question_cluster_similarity import (
+    EmbeddingSimilarityEngine,
     SimilaritySignals,
     canonicalize_question_text,
     compute_similarity_signals,
@@ -17,11 +27,6 @@ from question_cluster_similarity import (
     score_representative_question,
 )
 from question_detection_rules import safe_text
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-SCRIPTS_ROOT = SCRIPT_DIR.parent
-SERVICE_ROOT = SCRIPTS_ROOT.parent
-REPO_ROOT = SERVICE_ROOT.parent.parent
 
 
 @dataclass
@@ -43,49 +48,6 @@ class QuestionCluster:
     best_match_score: float = 0.0
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Build question clusters with online incremental clustering."
-    )
-    parser.add_argument(
-        "--input-path",
-        type=str,
-        required=True,
-        help="Path to input CSV or JSONL file containing question texts.",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="services/question-service/outputs/question_detection/question_clusters",
-        help="Directory to save clustering outputs.",
-    )
-    parser.add_argument(
-        "--text-column",
-        type=str,
-        default="text",
-        help="Column name containing question text.",
-    )
-    parser.add_argument(
-        "--question-id-column",
-        type=str,
-        default="question_id",
-        help="Optional column name containing stable question id.",
-    )
-    parser.add_argument(
-        "--threshold",
-        type=float,
-        default=0.60,
-        help="Similarity threshold for assigning a question to an existing cluster.",
-    )
-    parser.add_argument(
-        "--max-rows",
-        type=int,
-        default=None,
-        help="Optional cap for quick smoke tests.",
-    )
-    return parser.parse_args()
-
-
 def resolve_cli_path(raw_path: str) -> Path:
     path = Path(raw_path)
     if path.is_absolute():
@@ -95,7 +57,11 @@ def resolve_cli_path(raw_path: str) -> Path:
 
 def load_input_dataframe(input_path: Path) -> pd.DataFrame:
     if input_path.suffix.lower() == ".jsonl":
-        rows = [json.loads(line) for line in input_path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
+        rows = [
+            json.loads(line)
+            for line in input_path.read_text(encoding="utf-8-sig").splitlines()
+            if line.strip()
+        ]
         return pd.DataFrame(rows)
 
     if input_path.suffix.lower() == ".json":
@@ -118,6 +84,11 @@ def load_input_dataframe(input_path: Path) -> pd.DataFrame:
     return pd.read_csv(input_path)
 
 
+def save_input_dataframe(df: pd.DataFrame, output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(output_path, index=False, encoding="utf-8-sig")
+
+
 def build_member(question_id: str, text: str) -> ClusterMember:
     normalized_text = safe_text(text)
     return ClusterMember(
@@ -131,7 +102,11 @@ def build_member(question_id: str, text: str) -> ClusterMember:
 def maybe_update_representative(cluster: QuestionCluster) -> None:
     best_member = max(
         cluster.member_questions,
-        key=lambda member: (member.representative_score, len(member.text), member.question_id),
+        key=lambda member: (
+            member.representative_score,
+            len(member.text),
+            member.question_id,
+        ),
     )
     cluster.representative_question_id = best_member.question_id
     cluster.representative_question = best_member.text
@@ -143,20 +118,39 @@ def find_best_cluster(
     text: str,
     clusters: list[QuestionCluster],
     threshold: float,
+    similarity_mode: str,
+    embedding_engine: EmbeddingSimilarityEngine | None,
 ) -> tuple[QuestionCluster | None, SimilaritySignals | None]:
     best_cluster = None
     best_signals = None
 
     for cluster in clusters:
-        signals = compute_similarity_signals(text, cluster.representative_question)
-        if best_signals is None or signals.score > best_signals.score:
+        signals = compute_similarity_signals(
+            text=text,
+            candidate_text=cluster.representative_question,
+            embedding_engine=embedding_engine,
+        )
+        current_score = signals.rule_score if similarity_mode == "rule" else signals.final_score
+        best_score = (
+            best_signals.rule_score
+            if (best_signals is not None and similarity_mode == "rule")
+            else best_signals.final_score
+            if best_signals is not None
+            else -1.0
+        )
+
+        if best_signals is None or current_score > best_score:
             best_cluster = cluster
             best_signals = signals
 
     if best_cluster is None or best_signals is None:
         return None, None
 
-    if not is_cluster_match(best_signals, threshold=threshold):
+    decision_threshold = threshold
+    if similarity_mode == "embedding":
+        decision_threshold = max(threshold, 0.84)
+
+    if not is_cluster_match(best_signals, threshold=decision_threshold):
         return None, best_signals
 
     return best_cluster, best_signals
@@ -167,6 +161,8 @@ def build_clusters(
     text_column: str,
     question_id_column: str,
     threshold: float,
+    similarity_mode: str,
+    embedding_engine: EmbeddingSimilarityEngine | None,
 ) -> tuple[list[QuestionCluster], pd.DataFrame]:
     clusters: list[QuestionCluster] = []
     assignment_rows: list[dict[str, Any]] = []
@@ -184,6 +180,8 @@ def build_clusters(
             text=member.text,
             clusters=clusters,
             threshold=threshold,
+            similarity_mode=similarity_mode,
+            embedding_engine=embedding_engine,
         )
 
         if matched_cluster is None:
@@ -195,19 +193,22 @@ def build_clusters(
                 representative_canonical_text=member.canonical_text,
                 representative_score=member.representative_score,
                 member_questions=[member],
-                best_match_score=signals.score if signals else 0.0,
+                best_match_score=signals.final_score if signals else 0.0,
             )
             clusters.append(cluster)
             assigned_cluster = cluster
             decision = "new_cluster"
-            similarity_score = signals.score if signals else 0.0
+            similarity_score = signals.final_score if signals else 0.0
         else:
             matched_cluster.member_questions.append(member)
-            matched_cluster.best_match_score = max(matched_cluster.best_match_score, signals.score)
+            matched_cluster.best_match_score = max(
+                matched_cluster.best_match_score,
+                signals.final_score,
+            )
             maybe_update_representative(matched_cluster)
             assigned_cluster = matched_cluster
             decision = "append_to_cluster"
-            similarity_score = signals.score
+            similarity_score = signals.final_score
 
         assignment_rows.append(
             {
@@ -218,6 +219,12 @@ def build_clusters(
                 "representative_question": assigned_cluster.representative_question,
                 "cluster_member_count": len(assigned_cluster.member_questions),
                 "decision": decision,
+                "rule_score": round(float(signals.rule_score), 4) if signals else 0.0,
+                "embedding_score": (
+                    round(float(signals.embedding_score), 4)
+                    if signals and signals.embedding_score is not None
+                    else None
+                ),
                 "similarity_score": round(float(similarity_score), 4),
                 "keyword_tokens": " | ".join(extract_keyword_tokens(member.text)),
             }
@@ -285,28 +292,3 @@ def print_summary(clusters: list[QuestionCluster], assignment_df: pd.DataFrame) 
         print(f"[NEW CLUSTERS] {new_cluster_count}")
         print(f"[APPENDS] {append_count}")
 
-
-def main() -> None:
-    args = parse_args()
-    input_path = resolve_cli_path(args.input_path)
-    output_dir = resolve_cli_path(args.output_dir)
-
-    df = load_input_dataframe(input_path)
-    if args.text_column not in df.columns:
-        raise ValueError(f"Column '{args.text_column}' does not exist in input data.")
-
-    if args.max_rows is not None:
-        df = df.head(args.max_rows).copy()
-
-    clusters, assignment_df = build_clusters(
-        df=df,
-        text_column=args.text_column,
-        question_id_column=args.question_id_column,
-        threshold=args.threshold,
-    )
-    save_outputs(output_dir=output_dir, clusters=clusters, assignment_df=assignment_df)
-    print_summary(clusters=clusters, assignment_df=assignment_df)
-
-
-if __name__ == "__main__":
-    main()
