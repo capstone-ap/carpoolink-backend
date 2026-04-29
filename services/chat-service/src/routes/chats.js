@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import {
-    saveChatMessage,
     getChatMessages,
     getChatMessageCount,
     getMentoringStatus,
