@@ -52,11 +52,9 @@ export default function ScriptListPage() {
 
   const handleScriptClick = (scriptId: number, isPublished: boolean) => {
     if (userRole === "MENTOR" && !isPublished) {
-      // 1. 멘토이면서, 아직 발행되지 않은 스크립트 ("편집 필요")
-      // 💡 하드코딩되었던 100 대신, 실제 클릭한 scriptId로 이동하도록 수정했습니다.
       router.push(`/script/${scriptId}`); 
-    } else {
-      // 2. 멘티이거나, 이미 발행된 스크립트
+    } else if (isPublished) {
+      // 💡 발행 완료된 스크립트(멘토/멘티 공통) -> 읽기 전용 뷰로 이동
       router.push(`/mypage/scripts/${scriptId}`); 
     }
   };
@@ -90,17 +88,11 @@ export default function ScriptListPage() {
       </div>
 
       <div className="flex w-full border-b border-gray-100">
-        <button 
-          onClick={() => setActiveTab("1:1")}
-          className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:1" ? "text-[#1A1A1A]" : "text-gray-400"}`}
-        >
+        <button onClick={() => setActiveTab("1:1")} className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:1" ? "text-[#1A1A1A]" : "text-gray-400"}`}>
           1:1 멘토링
           {activeTab === "1:1" && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#1A1A1A]" />}
         </button>
-        <button 
-          onClick={() => setActiveTab("1:N")}
-          className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:N" ? "text-[#1A1A1A]" : "text-gray-400"}`}
-        >
+        <button onClick={() => setActiveTab("1:N")} className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:N" ? "text-[#1A1A1A]" : "text-gray-400"}`}>
           1:N 멘토링
           {activeTab === "1:N" && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#1A1A1A]" />}
         </button>
@@ -108,53 +100,62 @@ export default function ScriptListPage() {
 
       <div className="flex flex-col p-5 gap-4">
         {currentScripts.length > 0 ? (
-          currentScripts.map((script) => (
-            <div 
-              key={script.id} 
-              onClick={() => handleScriptClick(script.id, script.isPublished)}
-              className="flex flex-col bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer active:scale-[0.98]"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  {activeTab === "1:1" ? (
-                    <div className={`w-10 h-10 rounded-full ${(script as any).profileColor} flex items-center justify-center text-white`}>
-                      <User className="w-5 h-5" />
-                    </div>
-                  ) : (
-                    <div className={`w-10 h-10 rounded-lg ${(script as any).thumbnailColor} flex items-center justify-center text-white`}>
-                      <Users className="w-5 h-5" />
-                    </div>
-                  )}
-                  <div className="flex flex-col">
-                    <span className="text-[13px] font-bold text-gray-400">{script.mentorName} 멘토</span>
-                    <h3 className="text-[16px] font-bold leading-snug mt-0.5">{script.topic}</h3>
-                  </div>
-                </div>
-              </div>
+          currentScripts.map((script) => {
+            // 💡 1. 멘티이면서 아직 발행되지 않은 스크립트인지 확인
+            const isMenteeWaiting = userRole === "MENTEE" && !script.isPublished;
 
-              <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                <div className="flex items-center gap-3 text-[12px] font-medium text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {script.date}
+            return (
+              <div 
+                key={script.id} 
+                // 💡 2. 클릭 이벤트 막기: 대기중이 아닐 때만 handleScriptClick 실행
+                onClick={() => !isMenteeWaiting && handleScriptClick(script.id, script.isPublished)}
+                // 💡 3. 시각적 비활성화: 대기중이면 투명도를 낮추고 클릭 안 되는 커서(cursor-not-allowed)로 변경
+                className={`flex flex-col bg-white border border-gray-100 rounded-2xl p-5 shadow-sm transition-all
+                  ${isMenteeWaiting ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:shadow-md active:scale-[0.98]'}
+                `}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    {activeTab === "1:1" ? (
+                      <div className={`w-10 h-10 rounded-full ${(script as any).profileColor} flex items-center justify-center text-white`}>
+                        <User className="w-5 h-5" />
+                      </div>
+                    ) : (
+                      <div className={`w-10 h-10 rounded-lg ${(script as any).thumbnailColor} flex items-center justify-center text-white`}>
+                        <Users className="w-5 h-5" />
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-bold text-gray-400">{script.mentorName} 멘토</span>
+                      <h3 className="text-[16px] font-bold leading-snug mt-0.5">{script.topic}</h3>
+                    </div>
                   </div>
-                  
-                  {script.isPublished ? (
-                    <div className="flex items-center gap-1 text-green-600 font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      발행 완료
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1 text-[#FFCC00] font-bold">
-                      <Edit3 className="w-3.5 h-3.5" />
-                      {userRole === "MENTOR" ? "편집 필요" : "발행 대기중"}
-                    </div>
-                  )}
                 </div>
-                <ChevronRight className="w-4 h-4 text-gray-300" />
+
+                <div className="flex items-center justify-between pt-4 border-t border-gray-50">
+                  <div className="flex items-center gap-3 text-[12px] font-medium text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {script.date}
+                    </div>
+                    
+                    {script.isPublished ? (
+                      <div className="flex items-center gap-1 text-green-600 font-bold">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        발행 완료
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-[#FFCC00] font-bold">
+                        <Edit3 className="w-3.5 h-3.5" />
+                        {userRole === "MENTOR" ? "편집 필요" : "발행 대기중"}
+                      </div>
+                    )}
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div className="flex flex-col items-center justify-center py-20">
             <FileText className="w-12 h-12 text-gray-100 mb-4" />
