@@ -134,40 +134,5 @@ router.post("/upload", upload.single("audio"), async (req, res) => {
   }
 });
 
-//mentoringId로 전체 스크립트 조회
-router.get("/script/:mentoringId", async (req, res) => {
-  try {
-    const { mentoringId } = req.params;
-
-    const scripts = await prisma.script.findMany({
-      where: { mentoringId: BigInt(mentoringId) },
-      orderBy: { createdAt: "asc" },
-    });
-
-    if (scripts.length === 0) {
-      return res.status(404).json({ error: "해당 멘토링의 스크립트가 없습니다." });
-    }
-
-    // chunkIndex 순으로 정렬 후 텍스트 이어붙이기
-    const sorted = scripts.sort((a, b) => a.content.chunkIndex - b.content.chunkIndex);
-    const fullText = sorted.map((s) => s.content.text).join(" ");
-
-    res.json({
-      mentoringId,
-      totalChunks: scripts.length,
-      fullText,
-      chunks: sorted.map((s) => ({
-        scriptId: s.scriptId.toString(),
-        chunkIndex: s.content.chunkIndex,
-        startTime: s.content.startTime,
-        endTime: s.content.endTime,
-        text: s.content.text,
-      })),
-    });
-  } catch (err) {
-    console.error("[STT SCRIPT ERROR]", err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 export default router;
