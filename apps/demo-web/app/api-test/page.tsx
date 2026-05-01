@@ -29,7 +29,8 @@ export default function ApiTestPage() {
 
   return (
     <div style={{ padding: "20px", fontFamily: "sans-serif" }}>
-      <h1>API 통신 테스트 페이지</h1>
+      <h1 style={{color:"#e100ff"}}>
+        API 통신 테스트 페이지</h1>
       <h2 style={{ color: status.includes("성공") ? "green" : status.includes("실패") ? "red" : "black" }}>
         {status}
       </h2>
