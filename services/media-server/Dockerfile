@@ -15,6 +15,7 @@ COPY services/media-server/package.json ./services/media-server/
 COPY packages ./packages
 
 RUN npm ci --workspace services/media-server --include-workspace-root
+RUN npx prisma generate --schema=./packages/database/prisma/schema.prisma || true
 
 # 코드 복사
 COPY services/media-server/ ./services/media-server/

@@ -8,6 +8,7 @@ COPY package.json package-lock.json ./
 COPY services ./services
 COPY packages ./packages
 RUN npm ci --workspace services/question-service --include-workspace-root
+RUN npx prisma generate --schema=./packages/database/prisma/schema.prisma || true
 
 # 실행 워크스페이스로 이동
 WORKDIR /app/services/question-service
