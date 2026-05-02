@@ -3,7 +3,7 @@ name: Deploy Carpoolink Services
 on:
   push:
     branches:
-      - release/**
+      - main
     paths:
       - ".github/workflows/deploy.yml"
       - "services/**"
