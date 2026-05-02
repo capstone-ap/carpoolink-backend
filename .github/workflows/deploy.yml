@@ -81,6 +81,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix={{branch}}-
+            type=raw,value=${{ github.sha }}
             type=raw,value=latest
 
       - name: Build and push
@@ -175,49 +176,49 @@ jobs:
             docker rm carpoolink-stt-service 2>/dev/null || true
             
             # Core API 배포
-            docker pull ghcr.io/${{ env.REPO_OWNER }}/core-api:main && \
+            docker pull ghcr.io/${{ env.REPO_OWNER }}/core-api:${{ github.sha }} && \
             docker run --restart always \
               -d --name carpoolink-core-api \
               -p 4000:4000 \
               --network carpoolink-network \
               --env-file /app/.env \
-              ghcr.io/${{ env.REPO_OWNER }}/core-api:main
+              ghcr.io/${{ env.REPO_OWNER }}/core-api:${{ github.sha }}
             
             # Chat Service 배포
-            docker pull ghcr.io/${{ env.REPO_OWNER }}/chat-service:main && \
+            docker pull ghcr.io/${{ env.REPO_OWNER }}/chat-service:${{ github.sha }} && \
             docker run --restart always \
               -d --name carpoolink-chat-service \
               -p 4001:4001 \
               --network carpoolink-network \
               --env-file /app/.env \
-              ghcr.io/${{ env.REPO_OWNER }}/chat-service:main
+              ghcr.io/${{ env.REPO_OWNER }}/chat-service:${{ github.sha }}
             
             # Media Server 배포
-            docker pull ghcr.io/${{ env.REPO_OWNER }}/media-server:main && \
+            docker pull ghcr.io/${{ env.REPO_OWNER }}/media-server:${{ github.sha }} && \
             docker run --restart always \
               -d --name carpoolink-media-server \
               -p 4002:4002 \
               --network carpoolink-network \
               --env-file /app/.env \
-              ghcr.io/${{ env.REPO_OWNER }}/media-server:main
+              ghcr.io/${{ env.REPO_OWNER }}/media-server:${{ github.sha }}
             
             # Question Service 배포
-            docker pull ghcr.io/${{ env.REPO_OWNER }}/question-service:main && \
+            docker pull ghcr.io/${{ env.REPO_OWNER }}/question-service:${{ github.sha }} && \
             docker run --restart always \
               -d --name carpoolink-question-service \
               -p 4003:4003 \
               --network carpoolink-network \
               --env-file /app/.env \
-              ghcr.io/${{ env.REPO_OWNER }}/question-service:main
+              ghcr.io/${{ env.REPO_OWNER }}/question-service:${{ github.sha }}
             
             # STT Service 배포
-            docker pull ghcr.io/${{ env.REPO_OWNER }}/stt-service:main && \
+            docker pull ghcr.io/${{ env.REPO_OWNER }}/stt-service:${{ github.sha }} && \
             docker run --restart always \
               -d --name carpoolink-stt-service \
               -p 4004:4004 \
               --network carpoolink-network \
               --env-file /app/.env \
-              ghcr.io/${{ env.REPO_OWNER }}/stt-service:main
+              ghcr.io/${{ env.REPO_OWNER }}/stt-service:${{ github.sha }}
             
             # 미사용 이미지 정리
             docker image prune -af --filter "until=24h" || true
