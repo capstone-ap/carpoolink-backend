@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { User, ArrowRight } from "lucide-react";
+// 💡 실제 통신을 위해 apiClient를 불러옵니다.
+import apiClient from "@/lib/apiClient"; 
 
 export default function LoginPage() {
   const [userId, setUserId] = useState("");
@@ -10,7 +12,8 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  // 💡 async 함수로 변경하여 API 통신을 기다릴 수 있게 합니다.
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
@@ -21,22 +24,36 @@ export default function LoginPage() {
 
     setIsLoading(true);
 
-    // 💡 [Mock Data] 백엔드 API 연동 전 테스트를 위한 가상 분기 처리 로직
-    setTimeout(() => {
-      // 1. 사전설문 데이터가 없는 멘티인 경우 -> 사전설문 페이지로 이동
-      if (userId === "mentee_new") {
-        router.push("/survey");
-      } 
-      // 2. 그 외 (멘토이거나 사전설문 데이터가 있는 멘티) -> 홈(멘토 목록) 화면으로 이동
-      else if (userId === "mentor1" || userId === "mentee_old") {
+    try {
+      // 💡 [임시 우회 적용] POST /login 대신 GET /users/exists 엔드포인트를 찌릅니다.
+      // 백엔드 미들웨어(getUserIdFromRequest)가 헤더에서 값을 찾으므로 headers에 담아줍니다.
+      const response = await apiClient.get("/users/exists", {
+        headers: {
+          "x-user-id": userId,
+        },
+      });
+
+      // 1. DB에 해당 유저가 존재하는 경우 (exists === true)
+      if (response.data.exists) {
+        // 로컬 스토리지에 백엔드에서 확인된 실제 userId를 저장하여 "로그인 상태"로 만듭니다.
+        localStorage.setItem("userId", response.data.user.userId.toString());
+
+        // 💡 참고: 현재 /users/exists API는 설문(surveyType) 데이터를 반환하지 않습니다.
+        // 따라서 임시 우회 상태에서는 세부 분기 처리를 생략하고, 
+        // 일단 모두 홈("/")으로 통과시키도록 처리했습니다.
         router.push("/");
-      } 
-      // 3. 등록되지 않은 테스트 아이디
-      else {
-        setErrorMsg("존재하지 않는 아이디입니다. (테스트: mentee_new, mentee_old, mentor1)");
-        setIsLoading(false);
+      } else {
+        // 2. DB에 유저가 없는 경우 (exists === false)
+        setErrorMsg("존재하지 않는 아이디입니다.");
       }
-    }, 600); // 실제 API 통신처럼 살짝 딜레이를 줍니다.
+
+    } catch (error: any) {
+      console.error("로그인 실패:", error);
+      // 서버가 죽었거나 네트워크 통신 자체가 실패했을 때의 에러 처리
+      setErrorMsg("서버 통신 중 오류가 발생했습니다.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -95,19 +112,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-      </div>
-
-      {/* 테스트용 안내 뱃지 (나중에 백엔드 붙일 때 삭제하시면 됩니다) */}
-      <div className="mt-8 flex gap-2">
-        <button onClick={() => setUserId('mentee_new')} className="text-[11px] font-bold bg-white border border-gray-200 text-gray-500 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors">
-          테스트: 신규 멘티
-        </button>
-        <button onClick={() => setUserId('mentee_old')} className="text-[11px] font-bold bg-white border border-gray-200 text-gray-500 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors">
-          테스트: 기존 멘티
-        </button>
-        <button onClick={() => setUserId('mentor1')} className="text-[11px] font-bold bg-white border border-gray-200 text-gray-500 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors">
-          테스트: 멘토
-        </button>
       </div>
 
     </main>

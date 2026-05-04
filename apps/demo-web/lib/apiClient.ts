@@ -6,15 +6,18 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true,
+  //withCredentials: true,
 });
 
 // 2. 요청 인터셉터 (Request Interceptor): API를 쏠 때마다 헤더에 userId를 챙겨 넣음
+// apiClient.ts 내부의 요청 인터셉터 부분
 apiClient.interceptors.request.use((config) => {
   const userId = localStorage.getItem('userId');
-  if (userId) {
+  
+  if (userId && !config.headers['x-user-id']) {
     config.headers['x-user-id'] = userId;
   }
+  
   return config;
 });
 
