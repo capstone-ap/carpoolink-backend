@@ -12,13 +12,12 @@ import {
   Star, 
   ScrollText, 
   HelpCircle, 
-  MessageSquare 
+  MessageSquare,
+  LogOut // 💡 1. 로그아웃 아이콘 추가 임포트
 } from "lucide-react";
 
-// 💡 API 통신을 위한 apiClient 임포트 (경로는 실제 위치에 맞게 수정하세요)
 import apiClient from "@/lib/apiClient"; 
 
-// 서버에서 받아올 사용자 데이터 타입 정의
 interface UserProfile {
   nickname: string;
   remainingTickets: number; 
@@ -27,36 +26,26 @@ interface UserProfile {
 
 export default function MyPage() {
   const router = useRouter();
-  
-  // 💡 상태 관리 추가
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 💡 데이터 연동 및 접근 제어 로직
   useEffect(() => {
-    // 1. 미로그인 접근 차단 (Private Route)
     const userId = localStorage.getItem("userId");
     if (!userId) {
       alert("로그인이 필요한 서비스입니다.");
-      router.push("/login"); // 로그인 페이지로 리다이렉트
+      router.push("/login"); 
       return;
     }
 
-    // 💡 2. 데이터 통신 함수 수정
     const fetchUserData = async () => {
       try {
-        // 배포된 Core API(포트 4000)로 내 정보(/users/me)를 요청합니다.
-        // 인터셉터가 알아서 IP 주소와 신분증(x-user-id)을 붙여서 날려줍니다!
         const userRes = await apiClient.get("/users/me");
-        
-        // 서버에서 받아온 응답(userRes.data)을 상태에 예쁘게 담아줍니다.
         setUser({
           nickname: userRes.data.nickname || "사용자",
           remainingTickets: userRes.data.tickets ?? 0,
           surveyType: userRes.data.surveyType ?? "유형 없음",
         });
       } catch (error) {
-        // 401, 403 에러는 apiClient의 응답 인터셉터가 알아서 잡아서 로그인 페이지로 튕겨냅니다.
         console.error("마이페이지 데이터 호출 실패:", error);
       } finally {
         setIsLoading(false);
@@ -66,7 +55,18 @@ export default function MyPage() {
     fetchUserData();
   }, [router]);
 
-  // 로딩 중일 때 보여줄 UI (기존 디자인 무너짐 방지)
+  // 💡 2. 로그아웃 처리 함수 추가
+  const handleLogout = () => {
+    if (window.confirm("로그아웃 하시겠습니까?")) {
+      // 로컬 스토리지에 있는 인증 정보(신분증) 모두 삭제
+      localStorage.removeItem("userId");
+      localStorage.removeItem("accessToken"); // 토큰이 있다면 함께 삭제
+      
+      // 로그인 페이지로 이동
+      router.push("/login");
+    }
+  };
+
   if (isLoading || !user) {
     return (
       <main className="flex flex-col w-full bg-white text-[#1A1A1A] font-sans min-h-[100dvh] pb-[80px] items-center justify-center">
@@ -88,17 +88,14 @@ export default function MyPage() {
 
       {/* 2. 멘티 프로필 영역 */}
       <div className="flex items-center gap-4 px-5 py-6">
-        {/* 멘티 로고 아이콘 */}
         <div className="w-[72px] h-[72px] bg-[#111116] rounded-2xl flex flex-col items-center justify-center text-white shrink-0 shadow-sm">
           <span className="text-[15px] font-extrabold mb-1">멘티</span>
           <span className="text-[10px] font-bold tracking-widest">—O—O—</span>
         </div>
         
         <div className="flex items-center gap-2">
-          {/* 💡 하드코딩 제거: 서버에서 받아온 닉네임 렌더링 */}
           <h2 className="text-[20px] font-semibold tracking-tight">{user.nickname}</h2>
           
-          {/* 💡 하드코딩 제거: 서버에서 받아온 유형 뱃지 렌더링 */}
           {user.surveyType !== "유형 없음" && (
             <span className="inline-block bg-[#FFCC00] text-black text-[12px] font-semibold px-2.5 py-1 rounded-md w-fit">
               {user.surveyType}
@@ -111,7 +108,6 @@ export default function MyPage() {
       <div className="mx-5 mb-8 bg-[#F8F9FA] rounded-2xl p-4 flex items-center justify-between border border-gray-100 shadow-sm">
         <span className="text-[15px] font-bold text-gray-700 ml-1">사전 질문권 개수</span>
         <div className="flex items-center gap-3">
-          {/* 💡 하드코딩 제거: 서버에서 받아온 티켓 수 렌더링 */}
           <span className="text-[18px] font-extrabold">
             {user.remainingTickets} <span className="text-[14px] font-medium text-gray-500">개</span>
           </span>
@@ -184,6 +180,18 @@ export default function MyPage() {
           </div>
           <ChevronRight className="w-5 h-5 text-gray-300" />
         </Link>
+
+        {/* 💡 3. 로그아웃 버튼 (서브 메뉴 하단에 추가) */}
+        <button 
+          onClick={handleLogout} 
+          className="flex items-center justify-between py-4 group w-full text-left"
+        >
+          <div className="flex items-center gap-3">
+            <LogOut className="w-[22px] h-[22px] text-red-500 group-hover:text-red-600 transition-colors" strokeWidth={2} />
+            <span className="text-[16px] font-medium text-red-500 group-hover:text-red-600 transition-all">로그아웃</span>
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-300" />
+        </button>
       </div>
 
     </main>
