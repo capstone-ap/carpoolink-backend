@@ -7,7 +7,22 @@ import { Search, ChevronDown, Users, Radio, Check, AlertCircle } from "lucide-re
 
 import apiClient from "@/lib/apiClient";
 
+// 💡 상단 카테고리 정의
 const CATEGORIES = ["전체", "업무", "일상", "보상", "성장", "커리어", "업계", "멘탈", "실전", "기타"];
+
+// 💡 DB 필드와 UI 카테고리 매핑 테이블
+const FIELD_MAP: Record<string, string> = {
+  WORK: "업무",
+  LIFE: "일상",
+  REWARD: "보상",
+  GROWTH: "성장",
+  CAREER: "커리어",
+  INDUSTRY: "업계",
+  MENTAL: "멘탈",
+  ACTUAL: "실전",
+  ETC: "기타",
+};
+
 const SORT_OPTIONS = [
   { id: "viewers", label: "시청자 많은순" },
   { id: "newest", label: "최신순" },
@@ -23,6 +38,7 @@ interface MentoringStream {
   host: {
     userId: number;
     nickname: string;
+    fields: string[]; 
   };
   participantCount: number;
   category: string;
@@ -49,15 +65,18 @@ function LiveListContent() {
 
     const fetchLiveStreams = async () => {
       try {
-        const res = await apiClient.get("/mentorings/group", {
+        const res = await apiClient.get("/api/mentorings/group", {
           params: { status: "ON_AIR" }
         });
         
-        // 데이터 매핑 시 불필요한 색상 로직 제거
         const fetchedData = res.data.mentorings.map((m: any) => {
+          // 💡 매핑 로직 적용: 영문 필드명을 한글 카테고리로 변환
+          const rawField = m.host?.fields && m.host.fields.length > 0 ? m.host.fields[0] : "ETC";
+          const mappedCategory = FIELD_MAP[rawField] || "기타";
+
           return {
             ...m,
-            category: "업무", // 백엔드에 카테고리가 추가되기 전까지 임시 고정
+            category: mappedCategory, 
           };
         });
 
@@ -180,7 +199,6 @@ function LiveListContent() {
           filteredAndSortedStreams.map((stream) => (
             <Link key={stream.mentoringId} href={`/mentoring_list/live_list/${stream.mentoringId}`} className="group flex flex-col gap-3">
               
-              {/* 💡 수정 1: 썸네일 영역에 Work_2.jpg 이미지 적용 */}
               <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-gray-100 border border-gray-100">
                 <img 
                   src="/images/thumbnail.jpg" 
@@ -195,7 +213,6 @@ function LiveListContent() {
                 </div>
               </div>
 
-              {/* 💡 수정 2: 프로필 영역에 mentor_profile 이미지 적용 */}
               <div className="flex gap-3 px-1">
                 <img 
                   src="/images/mentor_profile.jpg" 
@@ -204,6 +221,7 @@ function LiveListContent() {
                 />
                 <div className="flex flex-col flex-1 min-w-0 pt-0.5">
                   <h3 className="text-[16px] font-bold text-[#1A1A1A] truncate">{stream.title}</h3>
+                  {/* 💡 매핑된 한글 카테고리가 출력됩니다. */}
                   <p className="text-[13px] font-medium text-gray-500">{stream.host.nickname} · {stream.category}</p>
                 </div>
               </div>
@@ -222,7 +240,6 @@ function LiveListContent() {
   );
 }
 
-// 💡 수정된 부분: 불필요한 key 재설정 로직을 제거하여 스크롤 상태와 렌더링을 유지합니다.
 export default function LiveListPage() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
