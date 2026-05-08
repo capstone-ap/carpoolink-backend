@@ -50,12 +50,12 @@ export default function OneOnOneListPage() {
     const fetchMentoringData = async () => {
       try {
         // 1. 내 권한(Role) 확인
-        const userRes = await apiClient.get("/users/me");
+        const userRes = await apiClient.get("/api/users/me");
         const currentRole = userRes.data.role; // "MENTEE" or "MENTOR"
         setMyRole(currentRole);
 
         // 2. 실제 백엔드 엔드포인트 호출 (/mentorings/one-on-one)
-        const listRes = await apiClient.get("/mentorings/one-on-one");
+        const listRes = await apiClient.get("/api/mentorings/one-on-one");
         
         // 3. 백엔드 데이터(peers 배열)를 프론트 UI 구조에 맞게 매핑
         // 현재 백엔드에서는 userId, nickname, mentorId만 주고 있으므로 나머지는 임시 데이터로 채웁니다.
