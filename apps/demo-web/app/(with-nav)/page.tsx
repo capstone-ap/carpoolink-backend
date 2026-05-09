@@ -51,9 +51,10 @@ export default function HomePage() {
     fetchMentors();
   }, []);
 
-  // 카테고리 필터 + 검색어 필터 동시 적용
+  // 카테고리 필터 + 검색어 필터 + 고정 정렬 적용
   const filteredMentors = useMemo(() => {
-    let list = mentors;
+    // 원본 배열이 변형되지 않도록 얕은 복사 생성
+    let list = [...mentors];
 
     // 1. 카테고리 필터링
     if (activeCategory !== "전체") {
@@ -70,6 +71,12 @@ export default function HomePage() {
         mentor.nickname.toLowerCase().includes(q)
       );
     }
+
+    // 3. 고정 정렬 (mentorId 오름차순: 오래된 멘토부터 / 내림차순을 원하면 b - a로 변경)
+    // 업데이트 순서에 영향을 받지 않도록 고유 ID 값으로 정렬을 강제 고정합니다.
+    list.sort((a, b) => {
+      return Number(a.mentorId) - Number(b.mentorId);
+    });
 
     return list;
   }, [mentors, activeCategory, searchQuery]);
