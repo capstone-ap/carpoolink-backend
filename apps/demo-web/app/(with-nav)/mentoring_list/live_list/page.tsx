@@ -3,7 +3,7 @@
 import { useState, useMemo, Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { Search, ChevronDown, Users, Radio, Check, AlertCircle } from "lucide-react";
+import { Search, ChevronDown, Users, Check, AlertCircle, Plus, ChevronLeft } from "lucide-react"; // ChevronLeft 추가 (다만, 이전 요청에 따라 사용은 안 함)
 
 import apiClient from "@/lib/apiClient";
 
@@ -38,7 +38,7 @@ interface MentoringStream {
   host: {
     userId: number;
     nickname: string;
-    fields: string[]; 
+    fields: string[];
   };
   participantCount: number;
   // 단일 string이 아닌 string 배열로 관리합니다.
@@ -53,6 +53,11 @@ function LiveListContent() {
   const [isMounted, setIsMounted] = useState(false);
   const [streams, setStreams] = useState<MentoringStream[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [userRole, setUserRole] = useState("MENTOR");
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [titleInput, setTitleInput] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const activeCategory = searchParams.get("category") || "전체";
   const sortBy = searchParams.get("sort") || "viewers";
@@ -69,7 +74,7 @@ function LiveListContent() {
         const res = await apiClient.get("/api/mentorings/group", {
           params: { status: "ON_AIR" }
         });
-        
+
         const fetchedData = res.data.mentorings.map((m: any) => {
           // 호스트가 가진 "모든" 영문 필드를 한글 카테고리 배열로 변환
           const rawFields = m.host?.fields && m.host.fields.length > 0 ? m.host.fields : ["ETC"];
@@ -107,22 +112,42 @@ function LiveListContent() {
     setIsSortMenuOpen(false);
   };
 
+  const isValidTitle = titleInput.trim().length >= 1 && titleInput.length <= 200;
+
+  const handleStartMentoring = async () => {
+    if (!isValidTitle || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await apiClient.post("/media/mentorings/start", {
+        title: titleInput.trim(),
+        isGroup: true,
+        hasCamera: true,
+        hasMicrophone: true,
+      });
+      setIsDrawerOpen(false);
+      setTitleInput("");
+      router.push("/mentoring/live/mentor");
+    } catch (error) {
+      alert("멘토링 시작에 실패했습니다.");
+    } finally { setIsSubmitting(false); }
+  };
+
   const filteredAndSortedStreams = useMemo(() => {
     let list = [...streams];
-    
+
     // categories 배열 안에 선택된 탭(activeCategory)이 포함되어 있는지 검사
     if (activeCategory !== "전체") {
       list = list.filter(s => s.categories.includes(activeCategory));
     }
-    
+
     if (searchQuery.trim() !== "") {
       const q = searchQuery.toLowerCase();
-      list = list.filter(s => 
-        s.title.toLowerCase().includes(q) || 
+      list = list.filter(s =>
+        s.title.toLowerCase().includes(q) ||
         s.host.nickname.toLowerCase().includes(q)
       );
     }
-    
+
     if (sortBy === "viewers") {
       list.sort((a, b) => b.participantCount - a.participantCount);
     } else if (sortBy === "newest") {
@@ -130,15 +155,17 @@ function LiveListContent() {
     } else if (sortBy === "oldest") {
       list.sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
     }
-    
+
     return list;
   }, [streams, activeCategory, searchQuery, sortBy]);
 
   if (!isMounted) return <div className="w-full h-screen bg-white" />;
 
   return (
-    <div className="flex flex-col w-full bg-white text-[#1A1A1A] font-sans min-h-[100dvh] relative">
-      <header className={`sticky top-0 bg-white z-20 transition-all duration-300 ${isSearchOpen ? 'pb-2' : ''}`}>
+    <div className="flex flex-col w-full bg-white text-[#1A1A1A] font-sans min-h-[100dvh] relative overflow-hidden pb-[64px]">
+
+      {/* 헤더 및 리스트 영역 (기존 디자인 유지) */}
+      <header className={`sticky top-0 bg-white z-20 transition-all duration-300 shrink-0 ${isSearchOpen ? 'pb-2' : ''}`}>
         <div className="flex items-center justify-between px-5 py-4">
           {!isSearchOpen ? (
             <>
@@ -165,7 +192,8 @@ function LiveListContent() {
         </div>
       </header>
 
-      <div className="flex gap-2 overflow-x-auto px-5 py-2 scrollbar-hide">
+      {/* 카테고리 (기존 디자인 유지) */}
+      <div className="flex gap-2 overflow-x-auto px-5 py-2 shrink-0 scrollbar-hide">
         {CATEGORIES.map((category) => (
           <button key={category} type="button" onClick={() => handleCategoryClick(category)} className={`shrink-0 px-4 py-2 rounded-full text-[14px] font-bold border transition-all ${activeCategory === category ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]' : 'bg-white text-gray-500 border-gray-200'}`}>
             {category}
@@ -173,12 +201,13 @@ function LiveListContent() {
         ))}
       </div>
 
-      <div className="px-5 py-4 flex items-center justify-between relative">
+      {/* 정렬 및 결과 수 (기존 디자인 유지) */}
+      <div className="px-5 py-4 flex items-center justify-between shrink-0 relative">
         <button type="button" onClick={() => setIsSortMenuOpen(!isSortMenuOpen)} className="flex items-center gap-1 text-[13px] font-bold text-gray-600 bg-gray-50 px-3 py-1.5 rounded-lg">
           {SORT_OPTIONS.find(opt => opt.id === sortBy)?.label}
           <ChevronDown className={`w-4 h-4 transition-transform ${isSortMenuOpen ? 'rotate-180' : ''}`} />
         </button>
-        
+
         {isSortMenuOpen && (
           <div className="absolute top-14 left-5 w-[160px] bg-white border border-gray-100 rounded-2xl shadow-xl z-30 p-2">
             {SORT_OPTIONS.map((option) => (
@@ -192,7 +221,8 @@ function LiveListContent() {
         <span className="text-[12px] font-bold text-gray-400">결과 {filteredAndSortedStreams.length}개</span>
       </div>
 
-      <div className="flex flex-col px-5 gap-6 pb-10 flex-1">
+      {/* 스트리밍 목록 (기존 스크롤 및 레이아웃 유지) */}
+      <div className="flex flex-col px-5 gap-6 pb-10 flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-gray-200 border-t-[#FFCC00] rounded-full animate-spin"></div>
@@ -200,12 +230,12 @@ function LiveListContent() {
         ) : filteredAndSortedStreams.length > 0 ? (
           filteredAndSortedStreams.map((stream) => (
             <Link key={stream.mentoringId} href={`/mentoring_list/live_list/${stream.mentoringId}`} className="group flex flex-col gap-3">
-              
+
               <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-gray-100 border border-gray-100">
-                <img 
-                  src="/images/thumbnail.jpg" 
-                  alt="멘토링 썸네일" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                <img
+                  src="/images/thumbnail.jpg"
+                  alt="멘토링 썸네일"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 <div className="absolute top-3 left-3 bg-red-600 text-white text-[11px] font-extrabold px-2 py-1 rounded-[6px] flex items-center gap-1">
                   <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" /> LIVE
@@ -216,9 +246,9 @@ function LiveListContent() {
               </div>
 
               <div className="flex gap-3 px-1">
-                <img 
-                  src="/images/mentor_profile.jpg" 
-                  alt="멘토 프로필" 
+                <img
+                  src="/images/mentor_profile.jpg"
+                  alt="멘토 프로필"
                   className="w-10 h-10 rounded-full shrink-0 object-cover bg-black"
                 />
                 <div className="flex flex-col flex-1 min-w-0 pt-0.5">
@@ -237,7 +267,68 @@ function LiveListContent() {
         )}
       </div>
 
-      {isSortMenuOpen && <div className="fixed inset-0 z-20" onClick={() => setIsSortMenuOpen(false)} />}
+      {/* 💡 MENTOR 전용 플로팅 버튼: 마우스 포인터 스타일(`cursor-pointer`)을 추가하고 바텀 시트 아래에 위치(`z-10`) */}
+      {userRole === "MENTOR" && (
+        <button
+          onClick={() => setIsDrawerOpen(true)}
+          className="absolute bottom-[84px] right-5 flex items-center justify-center w-14 h-14 bg-[#1A1A1A] text-white rounded-full shadow-2xl transition-transform active:scale-95 z-10 cursor-pointer"
+          aria-label="멘토링 생성"
+        >
+          <Plus className="w-7 h-7" />
+        </button>
+      )}
+
+      {/* 💡 바텀 시트 오버레이: 하단 패딩(pb-[64px])을 제거하여 시트를 바닥에 붙임 */}
+      <div
+        className={`absolute inset-0 z-20 flex flex-col justify-end bg-black/50 transition-opacity duration-500 ease-in-out ${isDrawerOpen ? "opacity-100 visible pointer-events-auto" : "opacity-0 invisible pointer-events-none"
+          }`}
+        onClick={() => setIsDrawerOpen(false)}
+      >
+        <div
+          className={`w-full bg-white rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.06)] flex flex-col transition-all duration-500 ease-in-out transform ${isDrawerOpen ? "translate-y-0" : "translate-y-full"
+            }`}
+          style={{ minHeight: "45vh" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* 헤더 (중앙 정렬) */}
+          <div className="w-full px-5 py-5 flex items-center justify-center shrink-0">
+            <h2 className="text-[17px] font-extrabold text-[#1A1A1A]">라이브 멘토링 시작</h2>
+          </div>
+
+          {/* 💡 입력 폼 영역: 하단 패딩(pb-[84px])을 여기에 추가하여 버튼을 내비바 위로 올리고 배경은 바닥까지 채움 */}
+          <div className="flex-1 px-5 pt-2 pb-[84px] flex flex-col">
+            <div className="flex flex-col gap-2 mb-6">
+              <input
+                type="text"
+                placeholder="멘토링 제목을 입력해주세요"
+                value={titleInput}
+                onChange={(e) => setTitleInput(e.target.value)}
+                className={`w-full py-3.5 px-4 rounded-xl text-[15px] font-medium focus:outline-none focus:ring-2 transition-all ${!isValidTitle && titleInput.length > 0
+                  ? "bg-red-50 border border-red-200 focus:ring-red-100"
+                  : "bg-gray-100 focus:ring-[#1A1A1A]/20"
+                  }`}
+              />
+              {!isValidTitle && titleInput.length > 0 && (
+                <p className="text-red-500 text-[12px] font-bold pl-1 animate-in fade-in">
+                  1~200자의 제목을 입력해주세요.
+                </p>
+              )}
+            </div>
+
+            {/* 버튼: mt-auto로 하단에 고정, cursor-pointer 적용 */}
+            <button
+              onClick={handleStartMentoring}
+              disabled={!isValidTitle || isSubmitting}
+              className={`w-full py-4 rounded-xl text-[16px] font-bold transition-colors mt-auto cursor-pointer ${isValidTitle && !isSubmitting
+                ? "bg-[#1A1A1A] text-white hover:bg-black"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
+            >
+              {isSubmitting ? "생성 중..." : "멘토링 시작하기"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
