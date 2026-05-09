@@ -1,4 +1,5 @@
 [core]
     remote = carpoolink
 ['remote "carpoolink"']
-    url = s3://capstone2026-carpoolink-dvc
+    url = s3://capstone2026-carpoolink-dvc-kro
+    region = ap-northeast-2
