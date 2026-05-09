@@ -67,7 +67,7 @@ export default function SurveyResultPage() {
 
   const fetchFromApi = async () => {
     try {
-      const res = await apiClient.get("/users/me");
+      const res = await apiClient.get("/api/users/me");
       const title = res.data.menteeProfile?.surveyResult;
       setSurveyTitle(title || "아직 설문 결과가 없습니다.");
     } catch (error) {
