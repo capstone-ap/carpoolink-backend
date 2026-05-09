@@ -41,7 +41,8 @@ interface MentoringStream {
     fields: string[]; 
   };
   participantCount: number;
-  category: string;
+  // 단일 string이 아닌 string 배열로 관리합니다.
+  categories: string[];
 }
 
 function LiveListContent() {
@@ -70,13 +71,13 @@ function LiveListContent() {
         });
         
         const fetchedData = res.data.mentorings.map((m: any) => {
-          // 💡 매핑 로직 적용: 영문 필드명을 한글 카테고리로 변환
-          const rawField = m.host?.fields && m.host.fields.length > 0 ? m.host.fields[0] : "ETC";
-          const mappedCategory = FIELD_MAP[rawField] || "기타";
+          // 호스트가 가진 "모든" 영문 필드를 한글 카테고리 배열로 변환
+          const rawFields = m.host?.fields && m.host.fields.length > 0 ? m.host.fields : ["ETC"];
+          const mappedCategories = rawFields.map((field: string) => FIELD_MAP[field] || "기타");
 
           return {
             ...m,
-            category: mappedCategory, 
+            categories: mappedCategories, // 변환된 배열을 그대로 저장
           };
         });
 
@@ -109,8 +110,9 @@ function LiveListContent() {
   const filteredAndSortedStreams = useMemo(() => {
     let list = [...streams];
     
+    // categories 배열 안에 선택된 탭(activeCategory)이 포함되어 있는지 검사
     if (activeCategory !== "전체") {
-      list = list.filter(s => s.category === activeCategory);
+      list = list.filter(s => s.categories.includes(activeCategory));
     }
     
     if (searchQuery.trim() !== "") {
@@ -221,8 +223,8 @@ function LiveListContent() {
                 />
                 <div className="flex flex-col flex-1 min-w-0 pt-0.5">
                   <h3 className="text-[16px] font-bold text-[#1A1A1A] truncate">{stream.title}</h3>
-                  {/* 💡 매핑된 한글 카테고리가 출력됩니다. */}
-                  <p className="text-[13px] font-medium text-gray-500">{stream.host.nickname} · {stream.category}</p>
+                  {/* 배열 요소들을 슬래시(/) 기호로 이어 붙여 화면에 표시합니다. */}
+                  <p className="text-[13px] font-medium text-gray-500">{stream.host.nickname} · {stream.categories.join(" / ")}</p>
                 </div>
               </div>
             </Link>
