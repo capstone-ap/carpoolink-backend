@@ -38,6 +38,11 @@ export default function PublishedScriptPage({ params }: { params: Promise<{ id: 
             const isMentor = s.speaker?.isHostMentor;
             let text = s.content?.message || "";
 
+            // timestamp 출력
+            const timestamp = s.content?.timestamp 
+              ? `<span class="text-[12px] text-gray-400 font-medium ml-2 select-none">${s.content.timestamp}</span>` 
+              : "";
+
             // [비공개 처리] 권한이 없는 비공개 질문인 경우
             if (s.content?.isPrivate) {
               return `<div class="mb-4 text-gray-400 italic">🔒 <b>[${speakerName}]</b> ${text}</div>`;
@@ -51,7 +56,7 @@ export default function PublishedScriptPage({ params }: { params: Promise<{ id: 
             // 발화자 구분 가독성을 위해 이름 색상 다르게 지정
             const nameColor = isMentor ? "#D97706" : "#2563EB"; 
 
-            return `<div class="mb-4"><b style="color: ${nameColor};">[${speakerName}]</b> ${text}</div>`;
+            return `<div class="mb-4"><b style="color: ${nameColor};">[${speakerName}]</b>${timestamp}<br /><span class="inline-block mt-0.5">${text}</span></div>`;
           }).join('');
 
           // 스크립트 데이터가 비어있을 경우 방어 코드
