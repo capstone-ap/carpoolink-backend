@@ -47,12 +47,12 @@ export default function ScriptListPage() {
       setIsLoading(true);
       try {
         // [1] 유저 정보 조회하여 멘토 여부 확인
-        const userRes = await apiClient.get("/users/me");
+        const userRes = await apiClient.get("/api/users/me");
         setIsUserMentor(userRes.data?.user?.role === "MENTOR");
 
         // [2] 스크립트 목록 조회
         const typeParam = activeTab === "1:1" ? "one-on-one" : "group";
-        const scriptRes = await apiClient.get(`/scripts?type=${typeParam}`);
+        const scriptRes = await apiClient.get(`/api/scripts?type=${typeParam}`);
         
         const mappedScripts: ScriptItem[] = scriptRes.data.mentorings.map((m: any) => {
           const d = new Date(m.startedAt);

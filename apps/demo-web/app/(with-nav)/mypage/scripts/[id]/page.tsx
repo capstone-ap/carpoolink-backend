@@ -20,7 +20,7 @@ export default function PublishedScriptPage({ params }: { params: Promise<{ id: 
     const fetchScriptData = async () => {
       setIsLoading(true);
       try {
-        const res = await apiClient.get(`/scripts/${id}`);
+        const res = await apiClient.get(`/api/scripts/${id}`);
         const { mentoring, scripts } = res.data;
 
         // 날짜 포맷 변환
