@@ -1,11 +1,13 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, FileText, Loader2, AlertCircle } from "lucide-react";
 import apiClient from "@/lib/apiClient";
 
 export default function PublishedScriptPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
   const { id } = use(params);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -86,9 +88,13 @@ export default function PublishedScriptPage({ params }: { params: Promise<{ id: 
 
       {/* 헤더 */}
       <header className="flex items-center px-5 py-4 border-b border-gray-100 shrink-0 bg-white z-10">
-        <Link href="/mypage/scripts" className="p-1 -ml-1 hover:bg-gray-100 rounded-full transition-colors">
+        {/* <Link> 대신 router.back()을 사용하는 버튼으로 변경 */}
+        <button 
+          onClick={() => router.back()} 
+          className="p-1 -ml-1 hover:bg-gray-100 rounded-full transition-colors"
+        >
           <ChevronLeft className="w-6 h-6 text-[#1A1A1A]" strokeWidth={2.5} />
-        </Link>
+        </button>
         <h1 className="text-[17px] font-extrabold tracking-tight ml-2">멘토링 스크립트 열람</h1>
       </header>
 

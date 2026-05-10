@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, FileText, Calendar, User, Users, ChevronRight, Edit3, CheckCircle2, Search } from "lucide-react";
-
 import apiClient from "@/lib/apiClient";
 
 type ScriptItem = {
@@ -20,32 +19,36 @@ const COLORS = ["bg-blue-500", "bg-emerald-500", "bg-purple-900", "bg-orange-900
 
 export default function ScriptListPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
+  // URL 쿼리 파라미터(?type=group)를 읽어 초기 탭 상태 결정
+  const currentTabParam = searchParams.get("type") === "group" ? "1:N" : "1:1";
+  const [activeTab, setActiveTab] = useState<"1:1" | "1:N">(currentTabParam);
+
   // 상태 관리
-  const [activeTab, setActiveTab] = useState<"1:1" | "1:N">("1:1");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-
-  // API 상태 관리
   const [scripts, setScripts] = useState<ScriptItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // 💡 1. 유저 권한 상태 추가
   const [isUserMentor, setIsUserMentor] = useState(false);
 
-  // 💡 2. 초기 로딩 시 유저 정보 및 스크립트 목록 가져오기
+  // 탭 클릭 시 URL 쿼리 파라미터를 업데이트하는 함수
+  const handleTabChange = (tab: "1:1" | "1:N") => {
+    setActiveTab(tab);
+    const type = tab === "1:1" ? "one-on-one" : "group";
+    // 페이지 스크롤을 유지하면서 URL만 변경.
+    router.replace(`/mypage/scripts?type=${type}`, { scroll: false });
+  };
+
+  // 초기 로딩 시 유저 정보 및 스크립트 목록 가져오기
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoading(true);
       try {
         // [1] 유저 정보 조회하여 멘토 여부 확인
         const userRes = await apiClient.get("/users/me");
-        if (userRes.data?.user?.role === "MENTOR") {
-          setIsUserMentor(true);
-        } else {
-          setIsUserMentor(false);
-        }
+        setIsUserMentor(userRes.data?.user?.role === "MENTOR");
 
         // [2] 스크립트 목록 조회
         const typeParam = activeTab === "1:1" ? "one-on-one" : "group";
@@ -143,14 +146,19 @@ export default function ScriptListPage() {
         )}
       </header>
 
-      {/* 💡 4. 하드코딩된 테스트 전환 버튼 삭제 */}
-
+      {/* onClick 이벤트에서 handleTabChange 호출 */}
       <div className="flex w-full border-b border-gray-100">
-        <button onClick={() => {setActiveTab("1:1"); setSearchQuery("");}} className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:1" ? "text-[#1A1A1A]" : "text-gray-400"}`}>
+        <button 
+          onClick={() => handleTabChange("1:1")} 
+          className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:1" ? "text-[#1A1A1A]" : "text-gray-400"}`}
+        >
           1:1 멘토링
           {activeTab === "1:1" && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#1A1A1A]" />}
         </button>
-        <button onClick={() => {setActiveTab("1:N"); setSearchQuery("");}} className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:N" ? "text-[#1A1A1A]" : "text-gray-400"}`}>
+        <button 
+          onClick={() => handleTabChange("1:N")} 
+          className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:N" ? "text-[#1A1A1A]" : "text-gray-400"}`}
+        >
           1:N 멘토링
           {activeTab === "1:N" && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#1A1A1A]" />}
         </button>
