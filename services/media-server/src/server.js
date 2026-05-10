@@ -97,7 +97,8 @@ app.post('/mentorings/start', async (req, res) => {
             title,
             userId,
             isGroup,
-            status: 'ON_AIR'
+            status: 'ON_AIR',
+            isScriptPublished: false,
         });
 
         await mediaOrchestrator.ensureRoom(mentoring.mentoringId, {
