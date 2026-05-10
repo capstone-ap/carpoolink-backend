@@ -19,6 +19,7 @@ function parseType(type) {
 // 클라이언트가 참여한 멘토링 중 스크립트가 존재하는 멘토링을 찾는 함수
 function buildParticipatedMentoringWhere(userId, type) {
     const where = {
+        status: 'COMPLETED',
         OR: [
             { userId },
             {
@@ -176,6 +177,8 @@ router.get('/:mentoringId', requireUser, async (req, res, next) => {
         // 멘토링과 스크립트 조회 (접근 권한 및 스크립트 존재 여부 검증 포함)
         const mentoring = await prisma.mentoring.findFirst({
             where: {
+                status: 'COMPLETED',
+                isScriptPublished: req.user.role === 'MENTOR' ? undefined : true, // 멘토는 발행 여부 상관없이 조회 가능, 멘티는 발행된 스크립트인 경우만 조회 가능
                 mentoringId,
                 ...buildParticipatedMentoringWhere(req.user.userId),
                 scripts: {
