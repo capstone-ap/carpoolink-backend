@@ -156,6 +156,7 @@ async function main() {
             data: {
                 isGroup: false,
                 status: "READY",
+                isScriptPublished: true,
                 userId: mentor.userId,
             },
         });
@@ -165,6 +166,7 @@ async function main() {
                 title: "테스트 멘토링",
                 isGroup: false,
                 status: "READY",
+                isScriptPublished: true,
                 userId: mentor.userId,
             },
         });
