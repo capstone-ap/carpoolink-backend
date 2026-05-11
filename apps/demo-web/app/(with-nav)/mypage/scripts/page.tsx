@@ -10,7 +10,7 @@ type ScriptItem = {
   mentorName: string;
   topic: string;
   date: string;
-  isPublished: boolean; // TODO: 현재 API에 없으므로 임시로 true 처리
+  isPublished: boolean;
   isGroup: boolean;
   profileColor: string;
 };
@@ -31,13 +31,14 @@ export default function ScriptListPage() {
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [scripts, setScripts] = useState<ScriptItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // 현재 접속 유저 권한 상태
   const [isUserMentor, setIsUserMentor] = useState(false);
 
   // 탭 클릭 시 URL 쿼리 파라미터를 업데이트하는 함수
   const handleTabChange = (tab: "1:1" | "1:N") => {
     setActiveTab(tab);
     const type = tab === "1:1" ? "one-on-one" : "group";
-    // 페이지 스크롤을 유지하면서 URL만 변경.
     router.replace(`/mypage/scripts?type=${type}`, { scroll: false });
   };
 
@@ -45,18 +46,38 @@ export default function ScriptListPage() {
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoading(true);
+      
+      // 💡 [1] 유저 권한 확인 (스크립트 로딩과 분리하여 안전하게 실행)
+      let isMentor = false;
       try {
-        // [1] 유저 정보 조회하여 멘토 여부 확인
-        const userRes = await apiClient.get("/api/users/me");
-        setIsUserMentor(userRes.data?.user?.role === "MENTOR");
-
-        // [2] 스크립트 목록 조회
-        const typeParam = activeTab === "1:1" ? "one-on-one" : "group";
-        const scriptRes = await apiClient.get(`/api/scripts?type=${typeParam}`);
+        const userRes = await apiClient.get("/users/me");
         
+        // 🚨 F12 개발자 도구의 '콘솔(Console)' 탭에서 이 로그를 반드시 확인하세요!
+        console.log("👤 내 정보 API 응답:", userRes.data); 
+
+        // 💡 콘솔에 찍힌 데이터 구조에 맞춰 아래 조건을 수정해야 합니다!
+        // (예시 1) isMentor = userRes.data.role === "MENTOR";
+        // (예시 2) isMentor = userRes.data.userType === "mentor";
+        isMentor = userRes.data?.role === "MENTOR"; 
+        
+        setIsUserMentor(isMentor);
+      } catch (userError) {
+        console.error("유저 정보 로딩 실패:", userError);
+      }
+
+      // [2] 스크립트 목록 조회
+      try {
+        const typeParam = activeTab === "1:1" ? "one-on-one" : "group";
+        const scriptRes = await apiClient.get(`/scripts?type=${typeParam}`);
+        
+        // 💡 백엔드가 보내주는 진짜 데이터를 확인하기 위한 로그 추가!
+        console.log("📝 스크립트 API 응답:", scriptRes.data);
+
         const mappedScripts: ScriptItem[] = scriptRes.data.mentorings.map((m: any) => {
-          const d = new Date(m.startedAt);
-          const dateStr = `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`;
+          const d = m.startedAt ? new Date(m.startedAt) : null;
+          const dateStr = d 
+            ? `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
+            : "날짜 미상";
           
           return {
             id: Number(m.mentoringId),
@@ -65,13 +86,13 @@ export default function ScriptListPage() {
             date: dateStr,
             isGroup: m.isGroup,
             profileColor: COLORS[Number(m.mentoringId) % COLORS.length],
-            isPublished: true, // ⚠️ 임시 고정값
+            isPublished: Boolean(m.isScriptPublished),
           };
         });
 
         setScripts(mappedScripts);
       } catch (error) {
-        console.error("데이터 로딩 실패:", error);
+        console.error("스크립트 데이터 로딩 실패:", error);
       } finally {
         setIsLoading(false);
       }
@@ -98,12 +119,15 @@ export default function ScriptListPage() {
     return list;
   }, [scripts, searchQuery, sortOrder]);
 
-  // 💡 3. 유저 역할에 맞게 페이지 라우팅 로직 수정
+  // 💡 라우팅 로직: 멘토의 발행 전은 편집 뷰, 발행 완료는 열람 뷰
   const handleScriptClick = (scriptId: number, isPublished: boolean) => {
-    if (isUserMentor && !isPublished) {
-      router.push(`/script/${scriptId}`); 
-    } else if (isPublished) {
-      router.push(`/mypage/scripts/${scriptId}`); 
+    if (!isPublished) {
+      if (isUserMentor) {
+        router.push(`/script/${scriptId}`); // 멘토: 미발행 스크립트 클릭 시 편집 뷰로 이동
+      }
+      // 멘티: 미발행 스크립트는 UI 단에서 클릭을 막으므로 여기 도달하지 않음
+    } else {
+      router.push(`/mypage/scripts/${scriptId}`); // 공통: 발행 완료 스크립트 클릭 시 열람 뷰로 이동
     }
   };
 
@@ -146,7 +170,6 @@ export default function ScriptListPage() {
         )}
       </header>
 
-      {/* onClick 이벤트에서 handleTabChange 호출 */}
       <div className="flex w-full border-b border-gray-100">
         <button 
           onClick={() => handleTabChange("1:1")} 
@@ -185,15 +208,16 @@ export default function ScriptListPage() {
           </div>
         ) : processedScripts.length > 0 ? (
           processedScripts.map((script) => {
-            // 💡 5. 역할 기반 조건부 렌더링 로직 적용
+            // 💡 멘티이면서 미발행 상태인 스크립트 판별
             const isMenteeWaiting = !isUserMentor && !script.isPublished;
 
             return (
               <div 
                 key={script.id} 
+                // 💡 멘티 대기중일 때는 클릭 방지
                 onClick={() => !isMenteeWaiting && handleScriptClick(script.id, script.isPublished)}
                 className={`flex flex-col bg-white border border-gray-100 rounded-2xl p-5 shadow-sm transition-all
-                  ${isMenteeWaiting ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:shadow-md active:scale-[0.98]'}
+                  ${isMenteeWaiting ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:shadow-md active:scale-[0.98]'}
                 `}
               >
                 <div className="flex items-start justify-between mb-4">
@@ -229,11 +253,12 @@ export default function ScriptListPage() {
                     ) : (
                       <div className="flex items-center gap-1 text-[#FFCC00] font-bold">
                         <Edit3 className="w-3.5 h-3.5" />
+                        {/* 멘토면 "편집 필요", 멘티면 "발행 대기중" 출력 */}
                         {isUserMentor ? "편집 필요" : "발행 대기중"}
                       </div>
                     )}
                   </div>
-                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                  <ChevronRight className={`w-4 h-4 ${isMenteeWaiting ? 'text-gray-200' : 'text-gray-300'}`} />
                 </div>
               </div>
             );
