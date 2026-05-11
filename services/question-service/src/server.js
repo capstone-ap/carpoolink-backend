@@ -1,6 +1,7 @@
 import express from 'express';
 import { clusterQuestions } from './lib/questionClusterClient.js';
 import { predictQuestion } from './lib/questionDetectorClient.js';
+import { rankQuestion } from './lib/answerabilityClient.js';
 
 const app = express();
 const PORT = process.env.QUESTION_SERVICE_PORT || 4003;
@@ -68,6 +69,19 @@ app.post('/api/question-clustering/cluster', async (req, res) => {
         console.error('[question-service] clustering failed:', error);
         return res.status(500).json({
             error: 'QUESTION_CLUSTERING_FAILED',
+            message: error.message,
+        });
+    }
+});
+
+app.post('/api/questions/rank', async (req, res) => {
+    try {
+        const result = await rankQuestion(req.body ?? {});
+        return res.json({ service: 'question-service', ...result });
+    } catch (error) {
+        const isInvalidRequest = error.message.includes('must be a non-empty string');
+        return res.status(isInvalidRequest ? 400 : 500).json({
+            error: isInvalidRequest ? 'INVALID_REQUEST' : 'RANKING_FAILED',
             message: error.message,
         });
     }

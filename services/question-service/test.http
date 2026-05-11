@@ -1,0 +1,39 @@
+### Health check
+GET http://localhost:4003/health
+
+### 질문 탐지
+POST http://localhost:4003/api/question-detection/predict
+Content-Type: application/json
+
+{
+  "text": "포트폴리오는 어떻게 준비하면 될까요?"
+}
+
+### Answerability 점수 계산
+POST http://localhost:4003/api/questions/rank
+Content-Type: application/json
+
+{
+  "question": "3년차 백엔드 개발자로 이직 준비 중인데 포트폴리오는 어떻게 구성하면 될까요?",
+  "isPaid": false,
+  "sessionTopic": "개발자 이직 준비",
+  "recentMentorUtterances": [
+    "포트폴리오는 프로젝트 위주로 구성하는 게 좋아요",
+    "깃허브에 꾸준히 커밋 이력을 남기는 것도 중요해요"
+  ],
+  "mentorProfile": "5년차 백엔드 엔지니어, 스타트업 이직 경험 보유",
+  "mentorPastScripts": []
+}
+
+### 유료 질문 테스트
+POST http://localhost:4003/api/questions/rank
+Content-Type: application/json
+
+{
+  "question": "저는 신입인데 이거 어떻게 해요?",
+  "isPaid": true,
+  "sessionTopic": "개발자 이직 준비",
+  "recentMentorUtterances": [],
+  "mentorProfile": "5년차 백엔드 엔지니어",
+  "mentorPastScripts": []
+}
