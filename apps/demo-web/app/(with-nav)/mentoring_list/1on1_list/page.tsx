@@ -333,8 +333,8 @@ export default function OneOnOneListPage() {
               activeMessage.messages.map((msg) => (
                 <div key={msg.id} className={`flex flex-col w-3/4 ${msg.sender === "me" ? "self-end items-end" : "self-start items-start"}`}>
                   <div className={`p-3 text-[14px] shadow-sm ${msg.sender === "me"
-                      ? "bg-[#FFCC00] rounded-2xl rounded-tr-none text-[#1A1A1A]"
-                      : "bg-white border border-gray-100 rounded-2xl rounded-tl-none text-[#1A1A1A]"
+                    ? "bg-[#FFCC00] rounded-2xl rounded-tr-none text-[#1A1A1A]"
+                    : "bg-white border border-gray-100 rounded-2xl rounded-tl-none text-[#1A1A1A]"
                     }`}>
                     {msg.text}
                   </div>

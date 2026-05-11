@@ -31,6 +31,7 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
     const [error, setError] = useState<string | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [peerId, setPeerId] = useState<string | null>(null);
+    const [socket, setSocket] = useState<Socket | null>(null);
 
     const socketRef = useRef<Socket | null>(null);
     const isMountedRef = useRef(true);
@@ -42,7 +43,7 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
         setError(null);
 
         try {
-            const res = await apiClient.get(`/api/mentorings/${mentoringId}`);
+            const res = await apiClient.get(`/media/mentorings/${mentoringId}`);
             const data = res.data?.mentoring || res.data;
 
             if (isMountedRef.current) {
@@ -74,9 +75,12 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
 
         try {
             // Socket.IO 연결
+            const serverUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4002";
+
             const socket = io(
-                process.env.NEXT_PUBLIC_MEDIA_SERVER_URL || "http://localhost:4002",
+                serverUrl,
                 {
+                    path: "/media/socket.io",
                     reconnection: true,
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
@@ -146,6 +150,7 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
             });
 
             socketRef.current = socket;
+            setSocket(socket);
         } catch (err) {
             setError(err instanceof Error ? err.message : "소켓 연결 실패");
         }
@@ -166,6 +171,7 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
                 socketRef.current.disconnect();
                 socketRef.current = null;
             }
+            setSocket(null);
         };
     }, [mentoringId, fetchSessionData, connectToMentoring]);
 
@@ -174,11 +180,12 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
         if (!mentoringId) return;
 
         try {
-            await apiClient.post(`/api/mentorings/${mentoringId}/end`);
+            await apiClient.post(`/media/mentorings/${mentoringId}/end`);
             if (socketRef.current) {
                 socketRef.current.disconnect();
             }
             setIsConnected(false);
+            setSocket(null);
         } catch (err) {
             setError(err instanceof Error ? err.message : "멘토링 종료 실패");
         }
@@ -213,7 +220,7 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
         error,
         isConnected,
         peerId,
-        socket: socketRef.current,
+        socket,
 
         // 함수
         endMentoring,

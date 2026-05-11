@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { PhoneOff, Users, Volume2, Settings, Mic, Video, VideoOff, MessageSquare, Lock, AlertCircle } from "lucide-react";
+import { PhoneOff, Users, Volume2, Settings, Mic, MicOff, Video, VideoOff, MessageSquare, Lock, AlertCircle } from "lucide-react";
 import { useMentoringSession } from "@/hooks/useMentoringSession";
+import { useWebRtcSession } from "@/hooks/useWebRtcSession";
 
 interface Question {
     id: number;
@@ -15,16 +16,26 @@ interface Question {
 }
 
 export default function MentorLivePage() {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
     const [isChatOpen, setIsChatOpen] = useState(true);
     const [isExitPopupOpen, setIsExitPopupOpen] = useState(false);
-    const [isMicOn, setIsMicOn] = useState(true);
-    const [isCamOn, setIsCamOn] = useState(true);
     const [isReading, setIsReading] = useState(false);
     const [currentIdx, setCurrentIdx] = useState(0);
 
     // Hook 적용
-    const { sessionData, participantCount, isLoading, error, isConnected, endMentoring } =
+    const { sessionData, participantCount, isLoading, error, isConnected, peerId, socket, endMentoring } =
         useMentoringSession({ role: "mentor" });
+
+    // WebRTC 세션 시작
+    const { localStream, isCameraOn, isMicOn, setCameraOn, setMicOn, isReady: webRtcReady, error: webRtcError } =
+        useWebRtcSession({
+            socket,
+            mentoringId: sessionData?.mentoringId?.toString() || "",
+            peerId: peerId || "",
+            role: "mentor",
+        });
 
     const questionQueue: Question[] = [
         {
@@ -63,7 +74,24 @@ export default function MentorLivePage() {
 
     const currentQuestion = questionQueue[currentIdx];
 
-    // 💡 다음 질문으로 넘어가는 공통 함수 (넘어갈 때 읽기 상태 초기화)
+    // 로컬 스트림을 video element에 연결
+    useEffect(() => {
+        if (videoRef.current && localStream) {
+            videoRef.current.srcObject = localStream;
+
+            const playPromise = videoRef.current.play();
+            if (playPromise !== undefined) {
+                playPromise.catch((err) => {
+                    // AbortError는 무시하고, 진짜 에러만 콘솔에 찍습니다.
+                    if (err.name !== "AbortError") {
+                        console.error("비디오 재생 실패:", err);
+                    }
+                });
+            }
+        }
+    }, [localStream, isCameraOn]);
+
+    // 다음 질문으로 넘어가는 공통 함수 (넘어갈 때 읽기 상태 초기화)
     const handleNextQuestion = () => {
         setCurrentIdx((prev) => (prev + 1) % questionQueue.length);
         setIsReading(false);
@@ -75,7 +103,7 @@ export default function MentorLivePage() {
 
     const handleConfirmExit = async () => {
         await endMentoring();
-        window.location.href = "/mentoring/live";
+        window.location.href = "/mentoring_list/live_list"; // 종료 후 라이브 멘토링 목록 페이지로 이동
     };
 
     // 로딩/에러 상태 표시
@@ -88,13 +116,14 @@ export default function MentorLivePage() {
         );
     }
 
-    if (error) {
+    if (error || webRtcError) {
         return (
             <main className="flex flex-col w-full h-full bg-[#161616] text-white font-sans overflow-hidden items-center justify-center">
                 <div className="bg-red-500/20 p-4 rounded-2xl mb-4">
                     <AlertCircle className="w-8 h-8 text-red-500" />
                 </div>
-                <p className="text-red-400 font-bold mb-4">{error}</p>
+                {error && <p className="text-red-400 font-bold mb-2">세션 에러: {error}</p>}
+                {webRtcError && <p className="text-red-400 font-bold mb-4">미디어 에러: {webRtcError}</p>}
                 <Link href="/mentoring/live" className="bg-[#FFCC00] text-[#1A1A1A] font-bold px-6 py-3 rounded-xl hover:bg-[#E6B800]">
                     목록으로 돌아가기
                 </Link>
@@ -172,8 +201,14 @@ export default function MentorLivePage() {
 
                     {/* 비디오 화면 영역 */}
                     <div className="w-full aspect-[16/9] bg-[#1A1A1A] rounded-2xl relative overflow-hidden flex flex-col justify-between shadow-2xl shrink-0 border border-gray-800">
-                        {isCamOn ? (
-                            <img src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=1000&auto=format&fit=crop" alt="Mentor" className="absolute inset-0 w-full h-full object-cover opacity-90 transition-opacity duration-300" />
+                        {isCameraOn ? (
+                            <video
+                                ref={videoRef}
+                                className="absolute inset-0 w-full h-full object-cover"
+                                autoPlay
+                                playsInline
+                                muted
+                            />
                         ) : (
                             <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-[#1A1A1A] animate-in fade-in duration-300">
                                 <div className="bg-[#2A2A2A] p-4 rounded-full mb-3 shadow-inner">
@@ -232,13 +267,19 @@ export default function MentorLivePage() {
 
             {/* 푸터 컨트롤 바 */}
             <footer className="w-full bg-[#111111] border-t border-gray-800/50 py-3 px-6 flex justify-around items-center shrink-0 z-20 pb-safe relative">
-                <button onClick={() => setIsMicOn(!isMicOn)} className={`p-3.5 rounded-full transition-all ${!isMicOn ? 'bg-red-500/20 text-red-500' : 'text-white hover:bg-white/5'}`}>
-                    <Mic className="w-6 h-6" />
+                <button
+                    onClick={() => setMicOn(!isMicOn)}
+                    className={`p-3.5 rounded-full transition-all cursor-pointer ${!isMicOn ? 'bg-red-500/20 text-red-500' : 'text-white hover:bg-white/5'}`}
+                >
+                    {isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
                 </button>
-                <button onClick={() => setIsCamOn(!isCamOn)} className={`p-4 rounded-full shadow-lg transition-all ${isCamOn ? 'bg-[#FFCC00] text-[#1A1A1A]' : 'bg-gray-700 text-white'}`}>
-                    {isCamOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+                <button
+                    onClick={() => setCameraOn(!isCameraOn)}
+                    className={`p-4 rounded-full shadow-lg transition-all cursor-pointer ${isCameraOn ? 'bg-[#FFCC00] text-[#1A1A1A]' : 'bg-gray-700 text-white'}`}
+                >
+                    {isCameraOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
                 </button>
-                <button onClick={() => setIsChatOpen(!isChatOpen)} className={`p-3.5 rounded-full transition-all ${isChatOpen ? 'text-[#FFCC00] bg-white/5' : 'text-white hover:bg-white/10'}`}>
+                <button onClick={() => setIsChatOpen(!isChatOpen)} className={`p-3.5 rounded-full transition-all cursor-pointer ${isChatOpen ? 'text-[#FFCC00] bg-white/5' : 'text-white hover:bg-white/10'}`}>
                     <MessageSquare className="w-6 h-6" />
                 </button>
             </footer>

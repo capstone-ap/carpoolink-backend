@@ -3,8 +3,9 @@
 // 💡 useRef와 useEffect를 추가로 불러옵니다. (자동 스크롤용)
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Users, Send, Sparkles, Star, X, ChevronUp, ChevronDown, AlertCircle } from "lucide-react";
+import { Users, Send, Sparkles, Star, X, ChevronUp, ChevronDown, AlertCircle, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { useMentoringSession } from "@/hooks/useMentoringSession";
+import { useWebRtcSession } from "@/hooks/useWebRtcSession";
 
 // 채팅 데이터의 타입 정의
 interface ChatMessage {
@@ -16,14 +17,25 @@ interface ChatMessage {
 }
 
 export default function LiveMentoringPage() {
+    const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
     const [isPaidMode, setIsPaidMode] = useState(false);
     const [isPopupOpen, setIsPopupOpen] = useState(false);
     const [chatInput, setChatInput] = useState("");
     const [isAiOpen, setIsAiOpen] = useState(false);
 
     // Hook 적용
-    const { sessionData, participantCount, isLoading, error, isConnected } =
+    const { sessionData, participantCount, isLoading, error, isConnected, peerId, socket } =
         useMentoringSession({ role: "mentee" });
+
+    // WebRTC 세션 시작
+    const { isCameraOn, isMicOn, setCameraOn, setMicOn, remoteStreams, isReady: webRtcReady, error: webRtcError } =
+        useWebRtcSession({
+            socket,
+            mentoringId: sessionData?.mentoringId?.toString() || "",
+            peerId: peerId || "",
+            role: "mentee",
+        });
 
     // 💡 1. 채팅 목록을 관리하는 State (기본 더미 데이터 2개 포함)
     const [chats, setChats] = useState<ChatMessage[]>([
@@ -38,6 +50,17 @@ export default function LiveMentoringPage() {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chats]);
+
+    // 원격 스트림이 들어오면 video element에 연결
+    useEffect(() => {
+        if (remoteVideoRef.current && remoteStreams.size > 0) {
+            const firstStream = Array.from(remoteStreams.values())[0];
+            if (firstStream) {
+                remoteVideoRef.current.srcObject = firstStream;
+                remoteVideoRef.current.play().catch((err) => console.error("Failed to play remote video:", err));
+            }
+        }
+    }, [remoteStreams]);
     const addNewChat = (type: "free" | "paid", text: string) => {
         const newChat: ChatMessage = {
             id: Date.now(), // 고유 아이디 생성
@@ -87,13 +110,14 @@ export default function LiveMentoringPage() {
         );
     }
 
-    if (error) {
+    if (error || webRtcError) {
         return (
             <main className="flex flex-col w-full h-full bg-[#161616] text-white font-sans overflow-hidden items-center justify-center">
                 <div className="bg-red-500/20 p-4 rounded-2xl mb-4">
                     <AlertCircle className="w-8 h-8 text-red-500" />
                 </div>
-                <p className="text-red-400 font-bold mb-4">{error}</p>
+                {error && <p className="text-red-400 font-bold mb-2">세션 에러: {error}</p>}
+                {webRtcError && <p className="text-red-400 font-bold mb-4">미디어 에러: {webRtcError}</p>}
                 <Link href="/mentoring/live" className="bg-[#FFCC00] text-[#1A1A1A] font-bold px-6 py-3 rounded-xl hover:bg-[#E6B800]">
                     목록으로 돌아가기
                 </Link>
@@ -121,17 +145,30 @@ export default function LiveMentoringPage() {
                         <Users className="w-4 h-4 mr-1.5" />
                         {participantCount}
                     </div>
+                    <button
+                        onClick={() => setMicOn(!isMicOn)}
+                        className={`p-2 rounded-full transition-all ${!isMicOn ? 'bg-red-500/20 text-red-500' : 'text-white hover:bg-white/5'}`}
+                    >
+                        {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                    </button>
                 </div>
             </header>
 
             {/* 라이브 비디오 영역 */}
             <div className="px-4 shrink-0 z-10">
                 <div className="w-full aspect-[16/9] bg-gray-800 rounded-2xl relative overflow-hidden flex items-center justify-center">
-                    <img
-                        src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=1000&auto=format&fit=crop"
-                        alt="Live Stream"
-                        className="absolute inset-0 w-full h-full object-cover opacity-80"
-                    />
+                    {remoteStreams.size > 0 ? (
+                        <video
+                            ref={remoteVideoRef}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            autoPlay
+                            playsInline
+                        />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center gap-3">
+                            <div className="text-gray-400 text-sm">멘토의 영상을 기다리는 중...</div>
+                        </div>
+                    )}
                     <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent"></div>
                     <div className="absolute top-4 bg-red-600 text-white text-[11px] font-bold px-4 py-1.5 rounded-full shadow-lg">
                         비공개 질문 답변중
