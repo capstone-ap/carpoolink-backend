@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { 
   Settings, 
   ChevronRight, 
@@ -14,7 +15,7 @@ import {
   HelpCircle, 
   MessageSquare,
   LogOut,
-  RefreshCw // 💡 1. 재시작 아이콘 추가
+  RefreshCw
 } from "lucide-react";
 
 import apiClient from "@/lib/apiClient"; 
@@ -22,7 +23,8 @@ import apiClient from "@/lib/apiClient";
 interface UserProfile {
   nickname: string;
   remainingTickets: number; 
-  surveyType: string;       
+  surveyType: string;
+  role: string;       
 }
 
 export default function MyPage() {
@@ -45,6 +47,7 @@ export default function MyPage() {
           nickname: userRes.data.nickname || "사용자",
           remainingTickets: userRes.data.menteeProfile?.balance ?? 0,
           surveyType: userRes.data.menteeProfile?.surveyResult ?? "유형 없음",
+          role: userRes.data.role || "MENTEE",
         });
       } catch (error) {
         console.error("마이페이지 데이터 호출 실패:", error);
@@ -56,7 +59,7 @@ export default function MyPage() {
     fetchUserData();
   }, [router]);
 
-  // 💡 2. 설문 데이터 초기화 및 다시하기 로직
+  // 2. 설문 데이터 초기화 및 다시하기 로직
   const handleRetakeSurvey = async () => {
     if (window.confirm("기존 설문 결과가 초기화됩니다. 다시 테스트하시겠습니까?")) {
       try {
@@ -102,12 +105,19 @@ export default function MyPage() {
         </button>
       </header>
 
-      {/* 멘티 프로필 영역 */}
+      {/* 멘티/멘토 프로필 영역 */}
       <div className="flex flex-col px-5 py-6">
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-[72px] h-[72px] bg-[#111116] rounded-2xl flex flex-col items-center justify-center text-white shrink-0 shadow-sm">
-            <span className="text-[15px] font-extrabold mb-1">멘티</span>
-            <span className="text-[10px] font-bold tracking-widest">—O—O—</span>
+
+          {/* 사용자의 role에 따라 프로필 이미지를 분기하여 렌더링 */}
+          <div className="relative w-[72px] h-[72px] shrink-0 shadow-sm rounded-2xl overflow-hidden bg-gray-100 border border-gray-200">
+            <Image 
+              src={user.role === "MENTOR" ? "/images/mentor_profile.jpg" : "/images/mentee_profile.jpg"} 
+              alt="프로필 이미지" 
+              fill
+              className="object-cover"
+              sizes="72px"
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -120,7 +130,7 @@ export default function MyPage() {
               )}
             </div>
 
-            {/* 💡 3. 다시하기 버튼 추가 (프로필 옆/아래 배치) */}
+            {/* 3. 다시하기 버튼 */}
             <button
               onClick={handleRetakeSurvey}
               className="flex items-center gap-1.5 text-gray-500 hover:text-[#1A1A1A] transition-colors"
@@ -150,12 +160,12 @@ export default function MyPage() {
         <Link href="#" className="flex items-center justify-between py-4 group">
           <div className="flex items-center gap-3">
             <UserPen className="w-[22px] h-[22px] text-gray-500" strokeWidth={2} />
-            <span className="text-[16px] font-medium">멘티프로필 수정</span>
+            <span className="text-[16px] font-medium">
+              {user.role === "MENTOR" ? "멘토프로필 수정" : "멘티프로필 수정"}
+            </span>
           </div>
           <ChevronRight className="w-5 h-5 text-gray-300" />
         </Link>
-
-        {/* ... (기타 메뉴 생략) ... */}
 
         <Link href="/mypage/scripts" className="flex items-center justify-between py-4 group">
           <div className="flex items-center gap-3">

@@ -1,107 +1,130 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, FileText, Calendar, User, Users, ChevronRight, Edit3, CheckCircle2, Search } from "lucide-react";
+import apiClient from "@/lib/apiClient";
 
-// 💡 1. 1:1 스크립트와 1:N 스크립트를 아우르는 공통 타입을 정의합니다.
 type ScriptItem = {
   id: number;
   mentorName: string;
   topic: string;
   date: string;
   isPublished: boolean;
-  profileColor?: string;     // 1:1 전용 속성 (선택적)
-  thumbnailColor?: string;   // 1:N 전용 속성 (선택적)
+  isGroup: boolean;
+  profileColor: string;
 };
 
-// 💡 2. MOCK_SCRIPTS 객체에 방금 만든 타입을 명시해 줍니다.
-const MOCK_SCRIPTS: { ONE_ON_ONE: ScriptItem[]; ONE_TO_N: ScriptItem[] } = {
-  ONE_ON_ONE: [
-    {
-      id: 1,
-      mentorName: "AI네이티브개발자",
-      topic: "백엔드 신입 포트폴리오 전략",
-      date: "2026. 04. 25",
-      profileColor: "bg-blue-500",
-      isPublished: true, 
-    },
-    {
-      id: 2,
-      mentorName: "프론트엔드장인",
-      topic: "React 성능 최적화 심화 멘토링",
-      date: "2026. 04. 28",
-      profileColor: "bg-emerald-500",
-      isPublished: false, 
-    },
-  ],
-  ONE_TO_N: [
-    {
-      id: 101,
-      mentorName: "게임개발자K",
-      topic: "Unreal Engine 5 구조 설계 노하우 라이브",
-      date: "2026. 04. 20",
-      thumbnailColor: "bg-purple-900",
-      isPublished: true,
-    },
-    {
-      id: 102,
-      mentorName: "기획왕",
-      topic: "주니어 PM을 위한 데이터 지표 읽기",
-      date: "2026. 04. 27",
-      thumbnailColor: "bg-orange-900",
-      isPublished: false,
-    }
-  ]
-};
+const COLORS = ["bg-blue-500", "bg-emerald-500", "bg-purple-900", "bg-orange-900", "bg-pink-600"];
 
 export default function ScriptListPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
+  // URL 쿼리 파라미터(?type=group)를 읽어 초기 탭 상태 결정
+  const currentTabParam = searchParams.get("type") === "group" ? "1:N" : "1:1";
+  const [activeTab, setActiveTab] = useState<"1:1" | "1:N">(currentTabParam);
+
   // 상태 관리
-  const [activeTab, setActiveTab] = useState<"1:1" | "1:N">("1:1");
-  const [userRole, setUserRole] = useState<"MENTEE" | "MENTOR">("MENTEE");
-  
-  // 💡 검색 및 정렬을 위한 상태 추가
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [scripts, setScripts] = useState<ScriptItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // 현재 접속 유저 권한 상태
+  const [isUserMentor, setIsUserMentor] = useState(false);
 
-  // 💡 데이터 필터링 및 정렬 로직 (useMemo로 최적화)
+  // 탭 클릭 시 URL 쿼리 파라미터를 업데이트하는 함수
+  const handleTabChange = (tab: "1:1" | "1:N") => {
+    setActiveTab(tab);
+    const type = tab === "1:1" ? "one-on-one" : "group";
+    router.replace(`/mypage/scripts?type=${type}`, { scroll: false });
+  };
+
+  // 초기 로딩 시 유저 정보 및 스크립트 목록 가져오기
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      setIsLoading(true);
+      
+      // [1] 유저 권한 확인 (스크립트 로딩과 분리하여 안전하게 실행)
+      let isMentor = false;
+      try {
+        const userRes = await apiClient.get("/api/users/me");
+
+        isMentor = userRes.data?.role === "MENTOR"; 
+        
+        setIsUserMentor(isMentor);
+      } catch (userError) {
+        console.error("유저 정보 로딩 실패:", userError);
+      }
+
+      // [2] 스크립트 목록 조회
+      try {
+        const typeParam = activeTab === "1:1" ? "one-on-one" : "group";
+        const scriptRes = await apiClient.get(`/api/scripts?type=${typeParam}`);
+        
+        const mappedScripts: ScriptItem[] = scriptRes.data.mentorings.map((m: any) => {
+          const d = m.startedAt ? new Date(m.startedAt) : null;
+          const dateStr = d 
+            ? `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
+            : "날짜 미상";
+          
+          return {
+            id: Number(m.mentoringId),
+            mentorName: m.host?.nickname || "알 수 없음",
+            topic: m.title,
+            date: dateStr,
+            isGroup: m.isGroup,
+            profileColor: COLORS[Number(m.mentoringId) % COLORS.length],
+            isPublished: Boolean(m.isScriptPublished),
+          };
+        });
+
+        setScripts(mappedScripts);
+      } catch (error) {
+        console.error("스크립트 데이터 로딩 실패:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchInitialData();
+  }, [activeTab]);
+
   const processedScripts = useMemo(() => {
-    let list = activeTab === "1:1" ? MOCK_SCRIPTS.ONE_ON_ONE : MOCK_SCRIPTS.ONE_TO_N;
+    let list = [...scripts];
 
-    // 1. 검색어 필터링 (주제 제목 기준)
     if (searchQuery.trim() !== "") {
       list = list.filter(script => 
         script.topic.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
-    // 2. 날짜 정렬
-    list = [...list].sort((a, b) => {
-      // "2026. 04. 25" 형식을 "2026-04-25" 형식으로 변환하여 안전하게 Date 객체로 만듭니다.
+    list.sort((a, b) => {
       const dateA = new Date(a.date.split(". ").join("-")).getTime();
       const dateB = new Date(b.date.split(". ").join("-")).getTime();
-      
       return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
     });
 
     return list;
-  }, [activeTab, searchQuery, sortOrder]);
+  }, [scripts, searchQuery, sortOrder]);
 
+  // 라우팅 로직: 멘토의 발행 전은 편집 뷰, 발행 완료는 열람 뷰
   const handleScriptClick = (scriptId: number, isPublished: boolean) => {
-    if (userRole === "MENTOR" && !isPublished) {
-      router.push(`/script/${scriptId}`); 
-    } else if (isPublished) {
-      router.push(`/mypage/scripts/${scriptId}`); 
+    if (!isPublished) {
+      if (isUserMentor) {
+        router.push(`/script/${scriptId}`); // 멘토: 미발행 스크립트 클릭 시 편집 뷰로 이동
+      }
+      // 멘티: 미발행 스크립트는 UI 단에서 클릭을 막으므로 여기 도달하지 않음
+    } else {
+      router.push(`/mypage/scripts/${scriptId}`); // 공통: 발행 완료 스크립트 클릭 시 열람 뷰로 이동
     }
   };
 
   return (
     <main className="flex flex-col w-full bg-white text-[#1A1A1A] font-sans min-h-[100dvh] pb-[80px]">
       
-      {/* 💡 헤더 - 검색 버튼 및 검색창 입력 UI 추가 */}
       <header className="flex items-center justify-between px-2 py-4 sticky top-0 bg-white z-20 border-b border-gray-50">
         {!isSearchOpen ? (
           <>
@@ -138,36 +161,23 @@ export default function ScriptListPage() {
         )}
       </header>
 
-      <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-        <span className="text-[13px] font-bold text-gray-500">현재 접속 계정 테스트</span>
-        <div className="flex bg-gray-200 p-1 rounded-lg">
-          <button 
-            onClick={() => setUserRole("MENTEE")}
-            className={`px-3 py-1 text-[12px] font-bold rounded-md transition-all ${userRole === "MENTEE" ? "bg-white shadow-sm" : "text-gray-500"}`}
-          >
-            멘티 모드
-          </button>
-          <button 
-            onClick={() => setUserRole("MENTOR")}
-            className={`px-3 py-1 text-[12px] font-bold rounded-md transition-all ${userRole === "MENTOR" ? "bg-[#1A1A1A] text-[#FFCC00] shadow-sm" : "text-gray-500"}`}
-          >
-            멘토 모드
-          </button>
-        </div>
-      </div>
-
       <div className="flex w-full border-b border-gray-100">
-        <button onClick={() => {setActiveTab("1:1"); setSearchQuery("");}} className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:1" ? "text-[#1A1A1A]" : "text-gray-400"}`}>
+        <button 
+          onClick={() => handleTabChange("1:1")} 
+          className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:1" ? "text-[#1A1A1A]" : "text-gray-400"}`}
+        >
           1:1 멘토링
           {activeTab === "1:1" && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#1A1A1A]" />}
         </button>
-        <button onClick={() => {setActiveTab("1:N"); setSearchQuery("");}} className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:N" ? "text-[#1A1A1A]" : "text-gray-400"}`}>
+        <button 
+          onClick={() => handleTabChange("1:N")} 
+          className={`flex-1 py-4 text-[15px] font-bold transition-all relative ${activeTab === "1:N" ? "text-[#1A1A1A]" : "text-gray-400"}`}
+        >
           1:N 멘토링
           {activeTab === "1:N" && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#1A1A1A]" />}
         </button>
       </div>
 
-      {/* 💡 정렬 셀렉트 박스 및 결과 건수 */}
       <div className="flex items-center justify-between px-5 py-3 mt-1">
         <span className="text-[13px] font-bold text-gray-500">
           총 {processedScripts.length}건
@@ -182,29 +192,34 @@ export default function ScriptListPage() {
         </select>
       </div>
 
-      {/* 리스트 렌더링 (processedScripts 사용) */}
       <div className="flex flex-col px-5 pb-5 gap-4">
-        {processedScripts.length > 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <div className="w-8 h-8 border-4 border-gray-200 border-t-[#FFCC00] rounded-full animate-spin"></div>
+          </div>
+        ) : processedScripts.length > 0 ? (
           processedScripts.map((script) => {
-            const isMenteeWaiting = userRole === "MENTEE" && !script.isPublished;
+            // 멘티이면서 미발행 상태인 스크립트 판별
+            const isMenteeWaiting = !isUserMentor && !script.isPublished;
 
             return (
               <div 
                 key={script.id} 
+                // 멘티 대기중일 때는 클릭 방지
                 onClick={() => !isMenteeWaiting && handleScriptClick(script.id, script.isPublished)}
                 className={`flex flex-col bg-white border border-gray-100 rounded-2xl p-5 shadow-sm transition-all
-                  ${isMenteeWaiting ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:shadow-md active:scale-[0.98]'}
+                  ${isMenteeWaiting ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:shadow-md active:scale-[0.98]'}
                 `}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    {activeTab === "1:1" ? (
-                      <div className={`w-10 h-10 rounded-full ${script.profileColor} flex items-center justify-center text-white shrink-0`}>
-                        <User className="w-5 h-5" />
+                    {script.isGroup ? (
+                      <div className={`w-10 h-10 rounded-lg ${script.profileColor} flex items-center justify-center text-white shrink-0`}>
+                        <Users className="w-5 h-5" />
                       </div>
                     ) : (
-                      <div className={`w-10 h-10 rounded-lg ${script.thumbnailColor} flex items-center justify-center text-white shrink-0`}>
-                        <Users className="w-5 h-5" />
+                      <div className={`w-10 h-10 rounded-full ${script.profileColor} flex items-center justify-center text-white shrink-0`}>
+                        <User className="w-5 h-5" />
                       </div>
                     )}
                     <div className="flex flex-col">
@@ -229,11 +244,12 @@ export default function ScriptListPage() {
                     ) : (
                       <div className="flex items-center gap-1 text-[#FFCC00] font-bold">
                         <Edit3 className="w-3.5 h-3.5" />
-                        {userRole === "MENTOR" ? "편집 필요" : "발행 대기중"}
+                        {/* 멘토면 "편집 필요", 멘티면 "발행 대기중" 출력 */}
+                        {isUserMentor ? "편집 필요" : "발행 대기중"}
                       </div>
                     )}
                   </div>
-                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                  <ChevronRight className={`w-4 h-4 ${isMenteeWaiting ? 'text-gray-200' : 'text-gray-300'}`} />
                 </div>
               </div>
             );
