@@ -2,8 +2,7 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ChevronLeft, FileText, Loader2, AlertCircle } from "lucide-react";
+import { ChevronLeft, Loader2, AlertCircle } from "lucide-react";
 import apiClient from "@/lib/apiClient";
 
 export default function PublishedScriptPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,12 +19,14 @@ export default function PublishedScriptPage({ params }: { params: Promise<{ id: 
     const fetchScriptData = async () => {
       setIsLoading(true);
       try {
-        const res = await apiClient.get(`/api/scripts/${id}`);
+        const res = await apiClient.get(`/scripts/${id}`);
         const { mentoring, scripts } = res.data;
 
-        // 날짜 포맷 변환
-        const d = new Date(mentoring.startedAt);
-        const dateStr = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+        // 방어 로직이 적용된 날짜 포맷 변환
+        const d = mentoring.startedAt ? new Date(mentoring.startedAt) : null;
+        const dateStr = d 
+          ? `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`
+          : "날짜 미상";
 
         setMentoringInfo({
           title: mentoring.title,
@@ -36,27 +37,42 @@ export default function PublishedScriptPage({ params }: { params: Promise<{ id: 
           const htmlContent = scripts.map((s: any) => {
             const speakerName = s.speaker?.nickname || "알 수 없음";
             const isMentor = s.speaker?.isHostMentor;
-            let text = s.content?.message || "";
 
-            // timestamp 출력
+            // timestamp 출력 (존재할 경우)
             const timestamp = s.content?.timestamp 
               ? `<span class="text-[12px] text-gray-400 font-medium ml-2 select-none">${s.content.timestamp}</span>` 
               : "";
 
-            // [비공개 처리] 권한이 없는 비공개 질문인 경우
-            if (s.content?.isPrivate) {
-              return `<div class="mb-4 text-gray-400 italic">🔒 <b>[${speakerName}]</b> ${text}</div>`;
+            let textHTML = "";
+
+            // [1. 비공개 처리] 백엔드에서 내려준 비공개 메시지 출력
+            if (s.content?.isPrivate || s.isPrivate) {
+              textHTML = s.content?.text || "비공개 질문입니다.";
+              return `<div class="mb-4 text-gray-400 italic">🔒 <b>[${speakerName}]</b>${timestamp}<br /><span class="inline-block mt-0.5">${textHTML}</span></div>`;
             }
 
-            // [마스킹 처리] CSS의 투명/노란색 배경 효과를 받기 위해 span 태그로 감싸기
-            if (s.isMasked || s.content?.isMasked) {
-              text = `<span style="background-color: #FFCC00">${text}</span>`;
+            // [2. 부분 마스킹 배열(pieces) 처리]
+            if (s.content?.pieces && Array.isArray(s.content.pieces)) {
+              textHTML = s.content.pieces.map((piece: any) => {
+                // 백엔드에서 치환된 텍스트('마스킹된 부분입니다.')를 노란색 span으로 감싸기
+                if (piece.isMasked) {
+                  return `<span style="background-color: #FFCC00">${piece.text || "마스킹된 부분입니다."}</span>`;
+                }
+                return piece.text || "";
+              }).join('');
+            } 
+            // [3. 통문장 마스킹 또는 구버전 데이터(message) 호환 처리]
+            else {
+              textHTML = s.content?.text || s.content?.message || "";
+              if (s.masked || s.isMasked || s.content?.isMasked) {
+                textHTML = `<span style="background-color: #FFCC00">${textHTML}</span>`;
+              }
             }
 
             // 발화자 구분 가독성을 위해 이름 색상 다르게 지정
             const nameColor = isMentor ? "#D97706" : "#2563EB"; 
 
-            return `<div class="mb-4"><b style="color: ${nameColor};">[${speakerName}]</b>${timestamp}<br /><span class="inline-block mt-0.5">${text}</span></div>`;
+            return `<div class="mb-4"><b style="color: ${nameColor};">[${speakerName}]</b>${timestamp}<br /><span class="inline-block mt-0.5">${textHTML}</span></div>`;
           }).join('');
 
           // 스크립트 데이터가 비어있을 경우 방어 코드
@@ -78,7 +94,7 @@ export default function PublishedScriptPage({ params }: { params: Promise<{ id: 
   return (
     <main className="flex flex-col w-full h-[100dvh] bg-white text-[#1A1A1A] font-sans overflow-hidden relative">
       
-      {/* 편집기의 '멘티 뷰' CSS 로직을 그대로 가져왔습니다. */}
+      {/* 멘티 뷰 CSS 로직 (마스킹된 텍스트 글자색 투명화 및 블라인드 처리) */}
       <style>{`
         .mentee-view-container span[style*="rgb(255, 204, 0)"], 
         .mentee-view-container span[style*="#FFCC00"], 
@@ -93,7 +109,6 @@ export default function PublishedScriptPage({ params }: { params: Promise<{ id: 
 
       {/* 헤더 */}
       <header className="flex items-center px-5 py-4 border-b border-gray-100 shrink-0 bg-white z-10">
-        {/* <Link> 대신 router.back()을 사용하는 버튼으로 변경 */}
         <button 
           onClick={() => router.back()} 
           className="p-1 -ml-1 hover:bg-gray-100 rounded-full transition-colors"
@@ -118,8 +133,7 @@ export default function PublishedScriptPage({ params }: { params: Promise<{ id: 
           </div>
         ) : (
           <>
-
-            <p className="text-[11px] font-bold text-gray-400 tracking-wider mb-2 uppercase">Script ID: {id}</p>
+            <p className="text-[11px] font-bold text-gray-400 tracking-wider mb-2 uppercase">Mentoring ID: {id}</p>
             
             <h2 className="text-3xl font-extrabold text-[#1A1A1A] leading-tight mb-8">
               {mentoringInfo?.title}
