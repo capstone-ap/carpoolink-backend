@@ -47,17 +47,11 @@ export default function ScriptListPage() {
     const fetchInitialData = async () => {
       setIsLoading(true);
       
-      // 💡 [1] 유저 권한 확인 (스크립트 로딩과 분리하여 안전하게 실행)
+      // [1] 유저 권한 확인 (스크립트 로딩과 분리하여 안전하게 실행)
       let isMentor = false;
       try {
-        const userRes = await apiClient.get("/users/me");
-        
-        // 🚨 F12 개발자 도구의 '콘솔(Console)' 탭에서 이 로그를 반드시 확인하세요!
-        console.log("👤 내 정보 API 응답:", userRes.data); 
+        const userRes = await apiClient.get("/api/users/me");
 
-        // 💡 콘솔에 찍힌 데이터 구조에 맞춰 아래 조건을 수정해야 합니다!
-        // (예시 1) isMentor = userRes.data.role === "MENTOR";
-        // (예시 2) isMentor = userRes.data.userType === "mentor";
         isMentor = userRes.data?.role === "MENTOR"; 
         
         setIsUserMentor(isMentor);
@@ -68,11 +62,8 @@ export default function ScriptListPage() {
       // [2] 스크립트 목록 조회
       try {
         const typeParam = activeTab === "1:1" ? "one-on-one" : "group";
-        const scriptRes = await apiClient.get(`/scripts?type=${typeParam}`);
+        const scriptRes = await apiClient.get(`/api/scripts?type=${typeParam}`);
         
-        // 💡 백엔드가 보내주는 진짜 데이터를 확인하기 위한 로그 추가!
-        console.log("📝 스크립트 API 응답:", scriptRes.data);
-
         const mappedScripts: ScriptItem[] = scriptRes.data.mentorings.map((m: any) => {
           const d = m.startedAt ? new Date(m.startedAt) : null;
           const dateStr = d 
@@ -119,7 +110,7 @@ export default function ScriptListPage() {
     return list;
   }, [scripts, searchQuery, sortOrder]);
 
-  // 💡 라우팅 로직: 멘토의 발행 전은 편집 뷰, 발행 완료는 열람 뷰
+  // 라우팅 로직: 멘토의 발행 전은 편집 뷰, 발행 완료는 열람 뷰
   const handleScriptClick = (scriptId: number, isPublished: boolean) => {
     if (!isPublished) {
       if (isUserMentor) {
@@ -208,13 +199,13 @@ export default function ScriptListPage() {
           </div>
         ) : processedScripts.length > 0 ? (
           processedScripts.map((script) => {
-            // 💡 멘티이면서 미발행 상태인 스크립트 판별
+            // 멘티이면서 미발행 상태인 스크립트 판별
             const isMenteeWaiting = !isUserMentor && !script.isPublished;
 
             return (
               <div 
                 key={script.id} 
-                // 💡 멘티 대기중일 때는 클릭 방지
+                // 멘티 대기중일 때는 클릭 방지
                 onClick={() => !isMenteeWaiting && handleScriptClick(script.id, script.isPublished)}
                 className={`flex flex-col bg-white border border-gray-100 rounded-2xl p-5 shadow-sm transition-all
                   ${isMenteeWaiting ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:shadow-md active:scale-[0.98]'}

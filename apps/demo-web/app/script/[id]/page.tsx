@@ -28,7 +28,7 @@ export default function ScriptEditPage({ params }: { params: Promise<{ id: strin
     const fetchScriptData = async () => {
       setIsLoading(true);
       try {
-        const res = await apiClient.get(`/scripts/${id}`);
+        const res = await apiClient.get(`/api/scripts/${id}`);
         const { mentoring, scripts } = res.data;
 
         const d = mentoring.startedAt ? new Date(mentoring.startedAt) : null;
@@ -158,7 +158,7 @@ export default function ScriptEditPage({ params }: { params: Promise<{ id: strin
         };
       });
 
-      await apiClient.patch(`/scripts/${id}/publish`, { scripts: payloadScripts });
+      await apiClient.patch(`/api/scripts/${id}/publish`, { scripts: payloadScripts });
       
       alert("성공적으로 발행되었습니다!");
       setIsPublishPopupOpen(false);
@@ -172,7 +172,7 @@ export default function ScriptEditPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  // 3. 💡 에디터 키보드 제어 (Enter 줄바꿈 완전 차단)
+  // 3. 에디터 키보드 제어 (Enter 줄바꿈 차단)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault(); // Enter 키의 기본 동작(줄바꿈, 블록 분리)을 완벽히 무시합니다.
@@ -311,7 +311,7 @@ export default function ScriptEditPage({ params }: { params: Promise<{ id: strin
               suppressContentEditableWarning
               onClick={handleEditorClick}
               onInput={updateUndoState}
-              onKeyDown={handleKeyDown} // 💡 핵심: 여기서 Enter 동작을 완벽히 차단합니다.
+              onKeyDown={handleKeyDown}
               onKeyUp={updateUndoState}
               className={`editor-container text-[16px] leading-[1.9] text-gray-700 whitespace-pre-wrap tracking-tight transition-all p-4 -mx-4 rounded-xl
                 ${isMenteeView ? 'mentee-view bg-[#FAFAFA] border border-gray-100 pointer-events-none' : 'focus:ring-2 focus:ring-[#FFCC00]/30 cursor-text'}
