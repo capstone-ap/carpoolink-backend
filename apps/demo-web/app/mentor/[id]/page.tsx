@@ -36,13 +36,14 @@ interface MentorDetail {
 // 💡 2. params의 타입을 Promise 형태로 감싸줍니다.
 export default function MentorDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
-  
+
   // 💡 3. React.use()를 사용하여 비동기 params를 동기적으로 풀어줍니다!
   const unwrappedParams = use(params);
   const mentorId = unwrappedParams.id;
 
   const [mentor, setMentor] = useState<MentorDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -86,19 +87,44 @@ export default function MentorDetailPage({ params }: { params: Promise<{ id: str
 
   const title = `${mentor.nickname} 멘토와 함께하는 커피챗`;
   const countStr = `카풀링 ${mentor.count || 0}회`;
-  const fieldTags = mentor.fields && mentor.fields.length > 0 
-    ? mentor.fields.map(f => FIELD_MAP[f] || "기타") 
+  const fieldTags = mentor.fields && mentor.fields.length > 0
+    ? mentor.fields.map(f => FIELD_MAP[f] || "기타")
     : ["분야 미정"];
-  
+
   // 기본값을 빈 배열([])로 설정합니다.
-  const infoTags = mentor.info?.tags || []; 
+  const infoTags = mentor.info?.tags || [];
   const detailTags = mentor.info?.details || [];
   const locationTags = mentor.info?.locations || [];
   const priceStr = `${mentor.price?.toLocaleString() || 0}원 / 60분`;
 
+  const handleRegisterMentoring = async () => {
+    if (isRegistering) {
+      router.push('/mentoring_list/1on1_list');
+      return;
+    }
+
+    try {
+      setIsRegistering(true);
+
+      const res = await apiClient.post(`/api/mentors/${mentorId}/register`);
+
+      if (res.data?.mentoring) {
+        router.push('/mentoring_list/1on1_list');
+        return;
+      }
+
+      throw new Error('사전상담 시작에 실패했습니다.');
+    } catch (err) {
+      console.error('사전상담 시작 실패:', err);
+      alert('사전상담 시작에 실패했습니다.');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
   return (
     <main className="w-full max-w-md mx-auto h-[100dvh] bg-white relative shadow-sm flex flex-col font-sans">
-      
+
       <header className="flex items-center justify-between px-2 py-3 bg-white sticky top-0 z-20">
         <button onClick={() => router.back()} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
           <img src="/icons/arrow.svg" alt="뒤로가기" className="w-5 h-5 text-[#1A1A1A]" />
@@ -109,16 +135,16 @@ export default function MentorDetailPage({ params }: { params: Promise<{ id: str
       </header>
 
       <div className="flex-1 overflow-y-auto px-5 pb-[100px] custom-scrollbar">
-        
+
         <h1 className="text-[22px] font-bold text-[#1A1A1A] leading-snug mt-2 mb-8 tracking-tight">
           {title}
         </h1>
 
         <div className="flex items-center gap-4 mb-10">
-          <img 
-            src="/images/mentor_profile.jpg" 
+          <img
+            src="/images/mentor_profile.jpg"
             alt={`${mentor.nickname} 프로필`}
-            className="w-[72px] h-[72px] object-cover rounded-[20px] shrink-0 border border-gray-100" 
+            className="w-[72px] h-[72px] object-cover rounded-[20px] shrink-0 border border-gray-100"
           />
           <div className="flex flex-col gap-1.5">
             <h2 className="text-[18px] font-bold text-[#1A1A1A]">{mentor.nickname}</h2>
@@ -213,12 +239,17 @@ export default function MentorDetailPage({ params }: { params: Promise<{ id: str
       </div>
 
       <div className="absolute bottom-0 left-0 w-full bg-white px-5 py-3 pb-safe z-50">
-        <button className="w-full bg-[#111116] text-[white] font-bold text-[16px] py-4 rounded-xl hover:bg-black transition-colors active:scale-[0.98]">
-          사전상담하기
+        <button
+          onClick={handleRegisterMentoring}
+          disabled={isRegistering}
+          className="w-full bg-[#111116] text-[white] font-bold text-[16px] py-4 rounded-xl hover:bg-black transition-colors active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isRegistering ? '사전상담 이어하기' : '사전상담 시작하기'}
         </button>
       </div>
 
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .custom-scrollbar::-webkit-scrollbar { display: none; }
         .custom-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
