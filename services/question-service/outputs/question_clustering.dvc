@@ -1,0 +1,6 @@
+outs:
+- md5: 66f150d5f0cd220d87d2c52520e2c0e4.dir
+  size: 63266178
+  nfiles: 90
+  hash: md5
+  path: question_clustering
