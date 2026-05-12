@@ -64,10 +64,9 @@ router.get('/group', async (req, res, next) => {
     }
 });
 
-// [GET] /mentorings/one-on-one - 1:1 멘토링 상대 목록 조회 엔드포인트
+// [GET] /mentorings/one-on-one - 내가 참여한 1:1 멘토링 목록 조회 엔드포인트
 router.get('/one-on-one', requireUser, async (req, res, next) => {
     try {
-        const peers = new Map();
         const currentUserId = req.user.userId;
 
         const histories = await prisma.mentoring.findMany({
@@ -96,27 +95,44 @@ router.get('/one-on-one', requireUser, async (req, res, next) => {
             orderBy: [{ startedAt: 'desc' }, { mentoringId: 'desc' }],
         });
 
-        for (const mentoring of histories) {
+        const mentorings = histories.map((mentoring) => {
             const isHost = mentoring.userId === currentUserId;
-            const peerInfo = isHost
+            const counterpart = isHost
                 ? mentoring.participants.find((p) => p.userId !== currentUserId)?.user
                 : mentoring.hostMentor;
+            const normalizedStatus = mentoring.status === 'COMPLETED' ? 'COMPLETE' : mentoring.status;
+            const counterpartRole = isHost ? 'MENTEE' : 'MENTOR';
 
-            if (peerInfo && !peers.has(peerInfo.userId.toString())) {
-                peers.set(peerInfo.userId.toString(), {
-                    userId: peerInfo.userId,
-                    nickname: peerInfo.nickname,
-                    mentorId: isHost ? null : mentoring.hostMentor.mentorProfile?.mentorId ?? null,
+            return {
+                mentoringId: mentoring.mentoringId,
+                title: mentoring.title,
+                status: normalizedStatus,
+                rawStatus: mentoring.status,
+                startedAt: mentoring.startedAt,
+                endedAt: mentoring.endedAt ?? null,
+                scheduledAt: mentoring.startedAt ?? mentoring.endedAt ?? null,
+                counterpartName: counterpart?.nickname ?? null,
+                counterpartRole,
+                counterpart: counterpart
+                    ? {
+                        userId: counterpart.userId,
+                        nickname: counterpart.nickname,
+                    }
+                    : null,
+                host: {
+                    userId: mentoring.hostMentor.userId,
+                    nickname: mentoring.hostMentor.nickname,
+                    mentorId: mentoring.hostMentor.mentorProfile?.mentorId ?? null,
                     fields: mentoring.hostMentor.mentorProfile?.fields
-                        ? mentoring.hostMentor.mentorProfile.fields.map(f => f.fieldName)
+                        ? mentoring.hostMentor.mentorProfile.fields.map((f) => f.fieldName)
                         : [],
-                });
-            }
-        }
+                },
+            };
+        });
 
         res.json(
             serialize({
-                peers: Array.from(peers.values()),
+                mentorings,
             })
         );
     } catch (error) {
