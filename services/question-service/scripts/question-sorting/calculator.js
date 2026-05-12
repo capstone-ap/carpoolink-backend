@@ -8,8 +8,7 @@ const WEIGHTS = {
   sufficiency: 0.22,
   relevance:   0.25,
   flowFit:     0.20,
-  expertise:   0.10,
-  proficiency: 0.05,
+  expertise:   0.15,
   redundancyPenalty: 0.12,
 };
 
@@ -46,7 +45,6 @@ export async function computeAnswerability(input) {
     relevance,
     flowFit,
     expertise,
-    proficiency,
     redundancyPenalty,
     rankingMode,
     warnings,
@@ -70,8 +68,7 @@ export async function computeAnswerability(input) {
     WEIGHTS.sufficiency * sufficiency +
     WEIGHTS.relevance   * relevance   +
     WEIGHTS.flowFit     * flowFit     +
-    WEIGHTS.expertise   * expertise   +
-    WEIGHTS.proficiency * proficiency -
+    WEIGHTS.expertise   * expertise   -
     WEIGHTS.redundancyPenalty * redundancyPenalty;
 
   const qualityScore = (clarity + sufficiency) / 2;
@@ -91,7 +88,7 @@ export async function computeAnswerability(input) {
     priorityGroup: classifyPriorityGroup(normalizedAnswerabilityScore, qualityScore),
     rankingMode,
     warnings,
-    scores: { clarity, sufficiency, relevance, flowFit, expertise, proficiency, redundancyPenalty },
+    scores: { clarity, sufficiency, relevance, flowFit, expertise, redundancyPenalty },
     weights: WEIGHTS,
   };
 }

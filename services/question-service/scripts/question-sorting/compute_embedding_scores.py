@@ -3,7 +3,6 @@ SBERT 기반 Answerability 임베딩 점수 계산
 - relevance  : 질문 ↔ 세션 주제 + 최근 발화 + 이전 스크립트 구간 유사도
 - flow_fit   : 질문 ↔ 이전/현재/다음 스크립트 구간 + 현재 슬라이드 유사도
 - expertise  : 질문 ↔ 멘토 프로필 + 전문성 근거 스크립트 유사도
-- proficiency: 질문 ↔ 멘토 과거 스크립트 유사도 (cold start → 0.5)
 
 사용법:
   python compute_embedding_scores.py --input '<JSON>'
@@ -121,8 +120,9 @@ def compute_expertise(
     mentor_profile: str,
     mentor_expertise_evidence: list,
     previous_script_sections: list,
+    mentor_past_scripts: list,
 ) -> float:
-    if not mentor_profile and not mentor_expertise_evidence and not previous_script_sections:
+    if not mentor_profile and not mentor_expertise_evidence and not previous_script_sections and not mentor_past_scripts:
         return 0.5
 
     q_emb = model.encode(question)
@@ -138,25 +138,14 @@ def compute_expertise(
 
     if previous_script_sections:
         previous_score = top_average_similarity(model, q_emb, previous_script_sections[-5:])
-        scores.append((0.20, previous_score))
+        scores.append((0.15, previous_score))
+
+    if mentor_past_scripts:
+        past_script_score = top_average_similarity(model, q_emb, mentor_past_scripts, top_k=4)
+        scores.append((0.15, past_script_score))
 
     total_weight = sum(w for w, _ in scores)
     return float(np.clip(sum(w * s for w, s in scores) / total_weight, 0, 1))
-
-
-def compute_proficiency(model, question: str, past_scripts: list) -> float:
-    if not past_scripts:
-        return 0.5  # cold start
-
-    q_emb = model.encode(question)
-    s_embs = model.encode(past_scripts)
-
-    similarities = sorted((cos_sim(q_emb, s_emb) for s_emb in s_embs), reverse=True)
-    top_scores = similarities[:3]
-    top_average = sum(top_scores) / max(len(top_scores), 1)
-    strong_match_ratio = sum(1 for score in similarities if score > 0.72) / max(len(similarities), 1)
-
-    return float(np.clip((0.7 * top_average) + (0.3 * strong_match_ratio), 0, 1))
 
 
 def compute_redundancy_penalty(model, question: str, answered_questions: list, queued_questions: list) -> float:
@@ -223,8 +212,8 @@ def main():
             mentor_profile,
             expertise_evidence,
             previous_script_sections,
+            past_scripts,
         ),
-        'proficiency': compute_proficiency(model, question, past_scripts),
         'redundancy_penalty': compute_redundancy_penalty(
             model,
             question,
