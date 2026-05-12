@@ -12,14 +12,19 @@ const CONTEXT_KEYWORDS = [
   '현재', '저는', '제가', '했는데', '해봤는데', '있는데', '고민', '준비',
 ];
 
-export function scoreSufficiency(question) {
+export function scoreSufficiency(question, menteeProfile = '') {
   const trimmed = question.trim();
   if (!trimmed) return 0;
 
   const tokens = trimmed.split(/\s+/);
-  const lengthFactor = tokens.length < 5 ? 0.5 : Math.min(1, tokens.length / 20);
-  const contextEntityCount = CONTEXT_KEYWORDS.filter(kw => trimmed.includes(kw)).length;
-  const vaguePenalty = VAGUE_PRONOUNS.some(p => trimmed.includes(p)) ? 0.2 : 0;
+  const lengthFactor = tokens.length < 5 ? 0.45 : Math.min(1, tokens.length / 18);
+  const enrichedContext = `${trimmed} ${menteeProfile}`.trim();
+  const questionContextCount = CONTEXT_KEYWORDS.filter(kw => trimmed.includes(kw)).length;
+  const enrichedContextCount = CONTEXT_KEYWORDS.filter(kw => enrichedContext.includes(kw)).length;
+  const contextCoverage = Math.min(1, (questionContextCount + enrichedContextCount) / 5);
+  const profileResolvesContext = questionContextCount < 2 && enrichedContextCount >= 2;
+  const contextBonus = profileResolvesContext ? 0.12 : 0;
+  const vaguePenalty = VAGUE_PRONOUNS.some(p => trimmed.includes(p)) && !profileResolvesContext ? 0.25 : 0.08;
 
-  return clamp(Math.min(1, contextEntityCount / 3) * lengthFactor - vaguePenalty);
+  return clamp(contextCoverage * lengthFactor + contextBonus - vaguePenalty);
 }

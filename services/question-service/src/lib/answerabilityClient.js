@@ -5,9 +5,17 @@ export async function rankQuestion(input) {
         question,
         isPaid            = false,
         sessionTopic      = '',
+        previousScriptSections = [],
+        currentScriptSection = '',
+        currentSlideTitle = '',
+        nextScriptSection = '',
         recentMentorUtterances = [],
+        menteeProfile     = '',
         mentorProfile     = '',
+        mentorExpertiseEvidence = [],
         mentorPastScripts = [],
+        answeredQuestions = [],
+        queuedQuestions = [],
     } = input;
 
     if (typeof question !== 'string' || !question.trim()) {
@@ -18,8 +26,16 @@ export async function rankQuestion(input) {
         question,
         isPaid,
         sessionTopic,
+        previousScriptSections,
+        currentScriptSection,
+        currentSlideTitle,
+        nextScriptSection,
         recentMentorUtterances,
+        menteeProfile,
         mentorProfile,
+        mentorExpertiseEvidence,
         mentorPastScripts,
+        answeredQuestions,
+        queuedQuestions,
     });
 }

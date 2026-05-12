@@ -17,7 +17,15 @@ const DEFAULT_SCRIPT_PATH = path.join(
     'compute_embedding_scores.py',
 );
 
-const FALLBACK = { relevance: 0.5, expertise: 0.5, proficiency: 0.5 };
+const FALLBACK = {
+    relevance: 0.5,
+    flowFit: 0.5,
+    expertise: 0.5,
+    proficiency: 0.5,
+    redundancyPenalty: 0,
+    rankingMode: 'fallback',
+    warnings: ['AI embedding scores unavailable; fallback scores applied.'],
+};
 const TIMEOUT_MS = 60_000;  // 모델 로딩 포함
 
 function getPythonExecutable() {
@@ -39,8 +47,12 @@ export async function fetchAiScores(request) {
         const data = JSON.parse(stdout);
         return {
             relevance:   clamp(data.relevance),
+            flowFit:     clamp(data.flow_fit),
             expertise:   clamp(data.expertise),
             proficiency: clamp(data.proficiency),
+            redundancyPenalty: clamp(data.redundancy_penalty ?? 0),
+            rankingMode: 'hybrid',
+            warnings: [],
         };
     } catch (err) {
         console.warn('[answerability] Python 추론 실패, fallback 적용:', err.message);

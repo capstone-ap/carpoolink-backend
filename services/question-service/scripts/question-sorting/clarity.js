@@ -20,7 +20,12 @@ export function scoreClarity(question) {
 
   const hasNumber = /\d+/.test(trimmed);
   const hasQuestionMarker = QUESTION_MARKERS.some(m => trimmed.includes(m));
-  const specificityBonus = (hasNumber ? 0.1 : 0) + (hasQuestionMarker ? 0.1 : 0);
+  const hasQuestionEnding = /(나요|까요|인가요|한가요|되나요|싶어요|궁금합니다|알려\s*주세요|설명해\s*주세요)[?.!]*$/.test(trimmed);
+  const sentenceCount = trimmed.split(/[?!.]+/).filter(Boolean).length;
+  const clauseCount = (trimmed.match(/(그리고|또|혹은|아니면|이랑|랑|하고|및)/g) ?? []).length;
+  const tooLongPenalty = tokens.length > 35 ? 0.15 : 0;
+  const multiQuestionPenalty = sentenceCount > 2 || clauseCount > 3 ? 0.15 : 0;
+  const specificityBonus = (hasNumber ? 0.08 : 0) + (hasQuestionMarker ? 0.08 : 0) + (hasQuestionEnding ? 0.08 : 0);
 
-  return clamp(1 - vagueWordRatio + specificityBonus);
+  return clamp(0.75 - vagueWordRatio + specificityBonus - tooLongPenalty - multiQuestionPenalty);
 }
