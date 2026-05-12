@@ -13,11 +13,11 @@ const apiClient = axios.create({
 // apiClient.ts 내부의 요청 인터셉터 부분
 apiClient.interceptors.request.use((config) => {
   const userId = localStorage.getItem('userId');
-  
+
   if (userId && !config.headers['x-user-id']) {
     config.headers['x-user-id'] = userId;
   }
-  
+
   return config;
 });
 
