@@ -107,8 +107,8 @@ export default function LiveMentoringPage() {
             const mapped = messages.map(m => ({
                 id: m.mentoringChatId,
                 type: m.content.startsWith("[유료]") ? "paid" : "free", 
-                author: m.userName,
-                avatar: m.userId === String(userId) ? "🙋‍♂️" : "👤",
+                author: m.user?.nickname || m.userName || "익명멘티",
+                avatar: String(m.userId) === String(userId) ? "🙋‍♂️" : "👤",
                 content: m.content.replace("[유료] ", ""),
             })) as ChatMessage[];
             setChats(mapped);
@@ -118,8 +118,8 @@ export default function LiveMentoringPage() {
             setChats(prev => [...prev, {
                 id: m.mentoringChatId,
                 type: m.content.startsWith("[유료]") ? "paid" : "free",
-                author: m.userName,
-                avatar: m.userId === String(userId) ? "🙋‍♂️" : "👤",
+                author: m.user?.nickname || m.userName || "익명멘티",
+                avatar: String(m.userId) === String(userId) ? "🙋‍♂️" : "👤",
                 content: m.content.replace("[유료] ", ""),
             }]);
         });
