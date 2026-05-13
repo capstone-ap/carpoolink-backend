@@ -155,7 +155,12 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     );
                 });
 
-                const transport = device.createSendTransport(transportParams);
+                const transport = device.createSendTransport({
+                    id: transportParams.transportId,
+                    iceParameters: transportParams.iceParameters,
+                    iceCandidates: transportParams.iceCandidates,
+                    dtlsParameters: transportParams.dtlsParameters
+                });
 
                 transport.on("connect", async ({ dtlsParameters }, callback, errback) => {
                     try {
@@ -165,7 +170,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                                 requestId: `connect-send-transport-${Date.now()}`,
                                 action: "connectWebRtcTransport",
                                 data: {
-                                    transportId: transportParams.id,
+                                    transportId: transportParams.transportId,
                                     dtlsParameters,
                                 },
                             },
@@ -188,7 +193,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                                     requestId: `produce-${Date.now()}`,
                                     action: "produce",
                                     data: {
-                                        transportId: transportParams.id,
+                                        transportId: transportParams.transportId,
                                         kind,
                                         rtpParameters,
                                     },
@@ -200,6 +205,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                             );
                         });
 
+                        const serverProducerId = produceParams.producerId || produceParams.id;
                         callback({ id: produceParams.id });
                     } catch (err) {
                         errback(err instanceof Error ? err : new Error(String(err)));
@@ -245,7 +251,12 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     );
                 });
 
-                const transport = device.createRecvTransport(transportParams);
+                const transport = device.createRecvTransport({
+                    id: transportParams.transportId,
+                    iceParameters: transportParams.iceParameters,
+                    iceCandidates: transportParams.iceCandidates,
+                    dtlsParameters: transportParams.dtlsParameters
+                });
 
                 transport.on("connect", async ({ dtlsParameters }, callback, errback) => {
                     try {
@@ -255,7 +266,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                                 requestId: `connect-recv-transport-${Date.now()}`,
                                 action: "connectWebRtcTransport",
                                 data: {
-                                    transportId: transportParams.id,
+                                    transportId: transportParams.transportId,
                                     dtlsParameters,
                                 },
                             },
@@ -494,7 +505,6 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                 // 2. Mediasoup 장치 및 트랜스포트 생성 (송/수신 공통)
                 const device = await initDevice();
                 const sendTransport = await createSendTransport(device);
-                const recvTransport = await createRecvTransport(device);
 
                 // 3. 송출(Produce) 로직
                 // localStream이 존재할 때만 실행되도록 if문으로 감싸 타입을 확정합니다.

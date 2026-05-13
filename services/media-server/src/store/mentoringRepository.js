@@ -30,7 +30,7 @@ class InMemoryMentoringRepository {
         this.sessions = new Map();
         this.participations = new Map();
 
-        const mentorIds = (process.env.MEDIA_SERVER_MENTOR_IDS ?? '101')
+        const mentorIds = ('1')
             .split(',')
             .map((item) => item.trim())
             .filter(Boolean)

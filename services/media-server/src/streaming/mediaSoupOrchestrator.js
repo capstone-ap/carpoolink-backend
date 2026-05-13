@@ -20,7 +20,7 @@ const DEFAULT_MEDIA_CODECS = [
 
 // WebRTC 트랜스포트 생성 시 사용할 기본 옵션 설정
 const DEFAULT_TRANSPORT_OPTIONS = {
-    listenIps: [{ ip: '127.0.0.1', announcedIp: process.env.MEDIA_SERVER_ANNOUNCED_IP || undefined }],
+    listenIps: [{ ip: '0.0.0.0', announcedIp: process.env.SERVER_ANNOUNCED_IP || undefined }],
     enableUdp: true,
     enableTcp: true,
     preferUdp: true,
@@ -286,7 +286,7 @@ export class MediaSoupOrchestrator {
                     producer,
                     mentoringId,
                     userId: peer.userId,
-                }).catch((e)=> console.error('[produce] RTP 포워딩 시작 실패', e));
+                }).catch((e) => console.error('[produce] RTP 포워딩 시작 실패', e));
             }
         }
 
