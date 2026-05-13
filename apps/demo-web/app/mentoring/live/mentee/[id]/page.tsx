@@ -16,7 +16,7 @@ interface ChatMessage {
     id: string | number;
     type: "free" | "paid";
     author: string;
-    avatar: string;
+    senderId: string;
     content: string;
 }
 
@@ -108,7 +108,7 @@ export default function LiveMentoringPage() {
                 id: m.mentoringChatId,
                 type: m.content.startsWith("[유료]") ? "paid" : "free", 
                 author: m.user?.nickname || m.userName || "익명멘티",
-                avatar: String(m.userId) === String(userId) ? "🙋‍♂️" : "👤",
+                senderId: String(m.userId),
                 content: m.content.replace("[유료] ", ""),
             })) as ChatMessage[];
             setChats(mapped);
@@ -119,7 +119,7 @@ export default function LiveMentoringPage() {
                 id: m.mentoringChatId,
                 type: m.content.startsWith("[유료]") ? "paid" : "free",
                 author: m.user?.nickname || m.userName || "익명멘티",
-                avatar: String(m.userId) === String(userId) ? "🙋‍♂️" : "👤",
+                senderId: String(m.userId),
                 content: m.content.replace("[유료] ", ""),
             }]);
         });
@@ -324,26 +324,34 @@ export default function LiveMentoringPage() {
                         채팅 내역이 없습니다. 첫 인사를 남겨보세요!
                     </div>
                 ) : (
-                    chats.map((chat) => (
-                        <div key={chat.id} className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${chat.type === 'paid' ? 'bg-[#FFCC00] text-[#1A1A1A]' : 'bg-[#FFCC00]/20'}`}>
-                                <span className="text-xl">{chat.avatar}</span>
-                            </div>
-                            <div className="flex flex-col items-start">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-sm font-semibold text-gray-300">{chat.author}</span>
-                                    {chat.type === 'paid' && (
-                                        <span className="bg-[#FFCC00] text-[#1A1A1A] text-[10px] font-extrabold px-1.5 py-0.5 rounded tracking-wide">
-                                            유료 질문
-                                        </span>
-                                    )}
+                    chats.map((chat) => {
+                        const isMentor = sessionData?.host?.userId && String(chat.senderId) === String(sessionData.host.userId);
+                        const profileImage = isMentor ? "/images/mentor_profile.jpg" : "/images/mentee_profile.jpg";
+
+                        return (
+                            <div key={chat.id} className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                <img 
+                                    src={profileImage} 
+                                    alt={isMentor ? "멘토 프로필" : "멘티 프로필"} 
+                                    className="w-9 h-9 rounded-full object-cover shrink-0 bg-gray-800 border-2 border-[#FFCC00]"
+                                />
+
+                                <div className="flex flex-col items-start">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-sm font-semibold text-gray-400">{chat.author}</span>
+                                        {chat.type === 'paid' && (
+                                            <span className="bg-[#FFCC00] text-[#1A1A1A] text-[10px] font-extrabold px-1.5 py-0.5 rounded tracking-wide">
+                                                유료 질문
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className={`text-[15px] break-all leading-relaxed ${chat.type === 'paid' ? 'text-[#FFCC00]' : 'text-gray-100'}`}>
+                                        {chat.content}
+                                    </p>
                                 </div>
-                                <p className={`text-[15px] break-all leading-relaxed ${chat.type === 'paid' ? 'text-[#FFCC00]' : 'text-gray-200'}`}>
-                                    {chat.content}
-                                </p>
                             </div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
                 <div ref={messagesEndRef} />
             </div>
