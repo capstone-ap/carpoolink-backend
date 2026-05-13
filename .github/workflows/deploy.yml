@@ -208,8 +208,7 @@ jobs:
                 "media-server")
                   docker run --restart always \
                     -d --name carpoolink-media-server \
-                    -p 4002:4002 \
-                    --network carpoolink-network \
+                    --network host \
                     --env-file /app/.env \
                     ghcr.io/${{ env.REPO_OWNER }}/media-server:${{ github.sha }}
                   ;;
@@ -243,6 +242,7 @@ jobs:
                 -p 80:80 \
                 -p 443:443 \
                 --network carpoolink-network \
+                --add-host host.docker.internal:host-gateway \
                 -v /app/infra/reverse-proxy/default.conf:/etc/nginx/conf.d/default.conf:ro \
                 -v /etc/letsencrypt:/etc/letsencrypt:ro \
                 nginx:1.27-alpine
