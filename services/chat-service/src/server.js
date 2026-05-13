@@ -23,6 +23,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Socket.io 설정
 const io = new Server(httpServer, {
+    // /chat 경로로 소켓을 받음.
+    path: '/chat/socket.io', 
     cors: {
         origin: CORS_ORIGIN,
         methods: ['GET', 'POST'],
