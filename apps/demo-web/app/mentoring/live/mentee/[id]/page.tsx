@@ -3,10 +3,10 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 
-//import { useSearchParams } from "next/navigation"; 
+//import { useSearchParams } from "next/navigation";
 import { useParams } from "next/navigation";
 
-import { io, Socket } from "socket.io-client"; 
+import { io, Socket } from "socket.io-client";
 import { Users, Send, Sparkles, Star, X, ChevronUp, ChevronDown, AlertCircle, Play } from "lucide-react";
 
 import { useMentoringSession } from "@/hooks/useMentoringSession";
@@ -22,7 +22,7 @@ interface ChatMessage {
 
 export default function LiveMentoringPage() {
     const params = useParams();
-    const mentoringId = params?.id as string; 
+    const mentoringId = params?.id as string;
 
     const [role, setRole] = useState<string>("MENTEE");
     const [userId, setUserId] = useState<number | null>(null);
@@ -75,18 +75,18 @@ export default function LiveMentoringPage() {
     console.log("🚀 [채팅] 서버로 연결 시도 중... 주소:", CHAT_SERVER_URL);
 
     const socket = io(CHAT_SERVER_URL, {
-        path: '/chat/socket.io', 
+        path: '/chat/socket.io',
         withCredentials: true,
         transports: ["websocket", "polling"],
     });
 
     socket.on("connect", () => {
         console.log("✅ [채팅] 소켓 연결 완벽 성공!");
-        
-        socket.emit("join_chat", { 
-            mentoringId, 
-            userId: String(userId), 
-            userName 
+
+        socket.emit("join_chat", {
+            mentoringId,
+            userId: String(userId),
+            userName
         }, (res: any) => {
             if (res?.ok) {
                 console.log("✅ [채팅] 방 입장 완료!");
@@ -106,7 +106,7 @@ export default function LiveMentoringPage() {
         socket.on("message_history", (messages: any[]) => {
             const mapped = messages.map(m => ({
                 id: m.mentoringChatId,
-                type: m.content.startsWith("[유료]") ? "paid" : "free", 
+                type: m.content.startsWith("[유료]") ? "paid" : "free",
                 author: m.user?.nickname || m.userName || "익명멘티",
                 senderId: String(m.userId),
                 content: m.content.replace("[유료] ", ""),
@@ -149,6 +149,21 @@ export default function LiveMentoringPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chats]);
 
+    // 💡 [추가] 멘토가 라이브 멘토링을 종료하면 멘티 자동 이동
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleMentoringEnded = () => {
+            window.location.href = "/mentoring_list/live_list";
+        };
+
+        socket.on("mentoring:ended", handleMentoringEnded);
+
+        return () => {
+            socket.off("mentoring:ended", handleMentoringEnded);
+        };
+    }, [socket]);
+
     useEffect(() => {
         if (remoteVideoRef.current && remoteStreams.size > 0) {
             const combinedStream = new MediaStream();
@@ -171,23 +186,23 @@ export default function LiveMentoringPage() {
         }
     }, [remoteStreams]);
 
-    
+
     const handleSend = () => {
         // 1. 버튼이 눌렸는지 확인
         console.log("👉 [디버그] 전송 버튼 클릭됨! 입력값:", chatInput);
-        
+
         // 2. 차단 조건 상태 확인
-        console.log("👉 [디버그] 상태 체크:", { 
-            hasSocket: !!chatSocket, 
-            isSocketConnected: chatSocket?.connected, 
-            isChatClosed 
+        console.log("👉 [디버그] 상태 체크:", {
+            hasSocket: !!chatSocket,
+            isSocketConnected: chatSocket?.connected,
+            isChatClosed
         });
 
         if (!chatInput.trim() || !chatSocket || isChatClosed) {
             console.warn("🚨 [디버그] 차단 조건에 걸려 전송 취소됨!");
             return;
         }
-        
+
         if (chatInput.length > 200) {
             alert("메시지는 최대 200자까지만 입력할 수 있습니다.");
             return;
@@ -196,29 +211,29 @@ export default function LiveMentoringPage() {
         if (isPaidMode) {
             setIsPopupOpen(true);
         } else {
-            const payload = { 
-                mentoringId, 
-                userId: String(userId), 
-                userName, 
-                content: chatInput 
+            const payload = {
+                mentoringId,
+                userId: String(userId),
+                userName,
+                content: chatInput
             };
-            
+
             console.log("🚀 [디버그] 소켓으로 데이터 발사 payload:", payload); // 3. 발사 직전 확인
             chatSocket.emit("send_message", payload);
-            setChatInput(""); 
+            setChatInput("");
         }
     };
 
     const confirmPaidQuestion = () => {
         setIsPopupOpen(false);
         if (chatSocket && !isChatClosed) {
-            const payload = { 
-                mentoringId, 
-                userId: String(userId), 
-                userName, 
-                content: `[유료] ${chatInput}` 
+            const payload = {
+                mentoringId,
+                userId: String(userId),
+                userName,
+                content: `[유료] ${chatInput}`
             };
-            
+
             chatSocket.emit("send_message", payload);
             setChatInput("");
             setIsPaidMode(false);
@@ -257,7 +272,7 @@ export default function LiveMentoringPage() {
 
     return (
         <main className="flex flex-col w-full h-[100dvh] bg-[#161616] text-white relative font-sans overflow-hidden">
-            
+
             <header className="w-full px-5 py-4 flex items-center justify-between shrink-0 z-10">
                 <Link href="/mentoring_list/live_list" className="inline-flex items-center hover:opacity-80 transition-opacity">
                     <img src="/icons/arrow.svg" alt="화살표 아이콘" className="w-5 h-5 mr-2 text-[#FFCC00]" />
@@ -272,14 +287,14 @@ export default function LiveMentoringPage() {
                     </div>
                     <div className="flex items-center text-gray-400 text-sm font-medium">
                         <Users className="w-4 h-4 mr-1.5" />
-                        {onlineUserCount} 
+                        {onlineUserCount}
                     </div>
                 </div>
             </header>
 
             {/* 방 정보 및 비디오 송출 영역 */}
             <div className="px-4 shrink-0 z-10 flex flex-col gap-3">
-                
+
                 <div className="w-full aspect-[16/9] bg-gray-800 rounded-2xl relative overflow-hidden flex items-center justify-center">
                     {remoteStreams.size > 0 ? (
                         <>
@@ -330,9 +345,9 @@ export default function LiveMentoringPage() {
 
                         return (
                             <div key={chat.id} className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <img 
-                                    src={profileImage} 
-                                    alt={isMentor ? "멘토 프로필" : "멘티 프로필"} 
+                                <img
+                                    src={profileImage}
+                                    alt={isMentor ? "멘토 프로필" : "멘티 프로필"}
                                     className="w-9 h-9 rounded-full object-cover shrink-0 bg-gray-800 border-2 border-[#FFCC00]"
                                 />
 
@@ -358,9 +373,9 @@ export default function LiveMentoringPage() {
 
             <div className="relative px-4 pb-6 pt-2 shrink-0">
                 {isPaidMode && <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#FFCC00]/30 to-transparent pointer-events-none z-0 transition-all duration-500"></div>}
-                
+
                 <div className="relative z-10 flex flex-col items-end">
-                    
+
                     {!isChatClosed && (
                         <>
                             <button onClick={() => setIsAiOpen(!isAiOpen)} className="flex items-center gap-1.5 px-3 py-1.5 mb-2 bg-[#222222] border border-gray-700/50 rounded-full shadow-md hover:bg-gray-800 transition-colors active:scale-95">
