@@ -2,11 +2,10 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation"; 
+import { useParams } from "next/navigation";
 import { io, Socket } from "socket.io-client"; 
 import { PhoneOff, Users, Volume2, Settings, Mic, MicOff, Video, VideoOff, MessageSquare, Lock, AlertCircle } from "lucide-react";
 
-import apiClient from "@/lib/apiClient"; // 💡 core-api 통신용 클라이언트 추가
 import { useMentoringSession } from "@/hooks/useMentoringSession";
 import { useWebRtcSession } from "@/hooks/useWebRtcSession";
 
@@ -28,15 +27,12 @@ interface ChatMessage {
 }
 
 export default function MentorLivePage() {
-    const searchParams = useSearchParams();
-    const mentoringId = searchParams.get("id");
+    const params = useParams();
+    const mentoringId = params?.id as string;
 
     const [role, setRole] = useState<string>("MENTOR");
     const [userId, setUserId] = useState<number>(2);
     const [userName, setUserName] = useState<string>("멘토");
-
-    // 💡 core-api에서 불러올 멘토링 정보 상태
-    const [mentoringInfo, setMentoringInfo] = useState<{ title: string; hostName: string } | null>(null);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -78,30 +74,12 @@ export default function MentorLivePage() {
         setUserName(storedName);
     }, []);
 
-    // 💡 [core-api] 멘토링 방 정보 조회
-    useEffect(() => {
-        if (!mentoringId) return;
-
-        const fetchMentoringInfo = async () => {
-            try {
-                const res = await apiClient.get(`/api/mentorings/${mentoringId}`);
-                setMentoringInfo({
-                    title: res.data.title || "진행중인 멘토링",
-                    hostName: res.data.hostMentor?.nickname || "멘토",
-                });
-            } catch (err) {
-                console.error("멘토링 정보 로드 실패:", err);
-            }
-        };
-
-        fetchMentoringInfo();
-    }, [mentoringId]);
-
     useEffect(() => {
         if (!mentoringId || !userId) return;
 
-        const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || "http://localhost:4001";
+        const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4001";
         const newSocket = io(CHAT_SERVER_URL, {
+            path: '/chat/socket.io',
             withCredentials: true,
             transports: ["websocket", "polling"],
         });
@@ -171,14 +149,9 @@ export default function MentorLivePage() {
         setIsReading(false);
     };
 
-    // 💡 [core-api] 멘토링 세션 완전 종료 처리
+    // 멘토링 세션 완전 종료 처리
     const handleConfirmExit = async () => {
         try {
-            // DB 상태를 COMPLETED로 업데이트 (채팅 서버 및 웹 소켓 정리 유도)
-            await apiClient.patch(`/api/mentorings/${mentoringId}/status`, {
-                status: "COMPLETED"
-            });
-
             // 프론트엔드 WebRTC/Socket.io 세션 종료
             if (endMentoring) {
                 await endMentoring();
@@ -231,14 +204,6 @@ export default function MentorLivePage() {
             </header>
 
             <div className="flex-1 flex flex-col px-4 overflow-hidden relative">
-                
-                {/* 💡 멘토링 방 타이틀 및 호스트 정보 렌더링 */}
-                {mentoringInfo && (
-                    <div className="flex flex-col px-1 mb-3 shrink-0">
-                        <h2 className="text-[18px] font-bold text-white leading-tight">{mentoringInfo.title}</h2>
-                        <p className="text-[13px] text-gray-400 mt-1">{mentoringInfo.hostName} 멘토 (나)</p>
-                    </div>
-                )}
 
                 <div className={`flex flex-col transition-all duration-500 ${!isChatOpen ? 'flex-1 justify-center' : 'justify-start pt-2'}`}>
 
