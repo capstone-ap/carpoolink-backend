@@ -65,43 +65,43 @@ export default function LiveMentoringPage() {
     });
 
     useEffect(() => {
-    if (!mentoringId || !userId) {
-        console.log("⏳ [채팅] 방 ID 또는 유저 ID가 없어서 연결 대기중...");
-        return;
-    }
+        if (!mentoringId || !userId) {
+            console.log("⏳ [채팅] 방 ID 또는 유저 ID가 없어서 연결 대기중...");
+            return;
+        }
 
-    // 환경 변수 이름 매칭
-    const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4001";
-    console.log("🚀 [채팅] 서버로 연결 시도 중... 주소:", CHAT_SERVER_URL);
+        // 환경 변수 이름 매칭
+        const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4001";
+        console.log("🚀 [채팅] 서버로 연결 시도 중... 주소:", CHAT_SERVER_URL);
 
-    const socket = io(CHAT_SERVER_URL, {
-        path: '/chat/socket.io',
-        withCredentials: true,
-        transports: ["websocket", "polling"],
-    });
-
-    socket.on("connect", () => {
-        console.log("✅ [채팅] 소켓 연결 완벽 성공!");
-
-        socket.emit("join_chat", {
-            mentoringId,
-            userId: String(userId),
-            userName
-        }, (res: any) => {
-            if (res?.ok) {
-                console.log("✅ [채팅] 방 입장 완료!");
-                socket.emit("get_message_history", { mentoringId, limit: 50, offset: 0 });
-                socket.emit("get_online_users", { mentoringId });
-            } else {
-                console.error(`❌ [채팅] 방 입장 거부됨: ${res?.error}`);
-            }
+        const socket = io(CHAT_SERVER_URL, {
+            path: '/chat/socket.io',
+            withCredentials: true,
+            transports: ["websocket", "polling"],
         });
-    });
 
-    // 🚨 디버깅용 콘솔 출력 코드
-    socket.on("connect_error", (err) => {
-        console.error("❌ [채팅] 소켓 연결 실패! 상세 원인:", err.message);
-    });
+        socket.on("connect", () => {
+            console.log("✅ [채팅] 소켓 연결 완벽 성공!");
+
+            socket.emit("join_chat", {
+                mentoringId,
+                userId: String(userId),
+                userName
+            }, (res: any) => {
+                if (res?.ok) {
+                    console.log("✅ [채팅] 방 입장 완료!");
+                    socket.emit("get_message_history", { mentoringId, limit: 50, offset: 0 });
+                    socket.emit("get_online_users", { mentoringId });
+                } else {
+                    console.error(`❌ [채팅] 방 입장 거부됨: ${res?.error}`);
+                }
+            });
+        });
+
+        // 🚨 디버깅용 콘솔 출력 코드
+        socket.on("connect_error", (err) => {
+            console.error("❌ [채팅] 소켓 연결 실패! 상세 원인:", err.message);
+        });
 
         socket.on("message_history", (messages: any[]) => {
             const mapped = messages.map(m => ({
@@ -151,18 +151,18 @@ export default function LiveMentoringPage() {
 
     // 💡 [추가] 멘토가 라이브 멘토링을 종료하면 멘티 자동 이동
     useEffect(() => {
-        if (!socket) return;
+        if (!rtcSocket) return;
 
         const handleMentoringEnded = () => {
             window.location.href = "/mentoring_list/live_list";
         };
 
-        socket.on("mentoring:ended", handleMentoringEnded);
+        rtcSocket.on("mentoring:ended", handleMentoringEnded);
 
         return () => {
-            socket.off("mentoring:ended", handleMentoringEnded);
+            rtcSocket.off("mentoring:ended", handleMentoringEnded);
         };
-    }, [socket]);
+    }, [rtcSocket]);
 
     useEffect(() => {
         if (remoteVideoRef.current && remoteStreams.size > 0) {
