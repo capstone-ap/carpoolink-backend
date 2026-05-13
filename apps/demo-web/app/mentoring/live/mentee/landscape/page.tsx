@@ -58,22 +58,22 @@ export default function LandscapeLiveMentoringPage() {
   };
 
   const handleSuggestionClick = (question: string) => {
-    const cleanText = question.replace(/^\d+\.\s*/, ''); 
+    const cleanText = question.replace(/^\d+\.\s*/, '');
     setChatInput(cleanText);
     setIsAiOpen(false);
   };
 
   return (
     <main className="flex flex-row w-full h-full bg-[#161616] text-white font-sans overflow-hidden">
-      
+
       {/* ==========================================
           [좌측 패널] 비디오 및 컨트롤 (p-6 -> p-4로 여백 축소)
           ========================================== */}
       <div className="flex flex-col w-1/2 h-full p-4 border-r border-gray-800/60 relative z-10">
-        
+
         {/* 상단 네비게이션 (mb-5 -> mb-3) */}
         <header className="flex items-center justify-between shrink-0 mb-3 pl-1">
-          <Link href="/mentoring/live" className="inline-flex items-center hover:opacity-80 transition-opacity">
+          <Link href="/mentoring_list/live_list" className="inline-flex items-center hover:opacity-80 transition-opacity">
             <img src="/icons/arrow.svg" alt="화살표 아이콘" className="w-4 h-4 mr-2 text-[#FFCC00]" />
             <span className="font-bold text-[16px]">나가기</span>
           </Link>
@@ -91,9 +91,9 @@ export default function LandscapeLiveMentoringPage() {
 
         {/* 라이브 비디오 영역 */}
         <div className="flex-1 w-full bg-gray-800 rounded-2xl relative overflow-hidden shadow-xl">
-          <img 
-            src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=1200&auto=format&fit=crop" 
-            alt="Live Stream" 
+          <img
+            src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=1200&auto=format&fit=crop"
+            alt="Live Stream"
             className="absolute inset-0 w-full h-full object-cover opacity-85"
           />
           <div className="absolute top-4 inset-x-0 flex justify-center">
@@ -106,14 +106,14 @@ export default function LandscapeLiveMentoringPage() {
         {/* 모드 전환 버튼 (mt-6 -> mt-3, py-4 -> py-3) */}
         <div className="shrink-0 mt-3">
           {isPaidMode ? (
-            <button 
+            <button
               onClick={() => setIsPaidMode(false)}
               className="w-full bg-white text-[#1A1A1A] font-bold text-[15px] py-3 rounded-xl shadow-lg active:scale-[0.98] transition-all"
             >
               무료 채팅으로 돌아가기
             </button>
           ) : (
-            <button 
+            <button
               onClick={() => setIsPaidMode(true)}
               className="w-full bg-[#FFCC00] text-[#1A1A1A] font-bold text-[15px] py-3 rounded-xl shadow-[0_8px_24px_-4px_rgba(255,204,0,0.4)] active:scale-[0.98] transition-all flex items-center justify-center"
             >
@@ -128,7 +128,7 @@ export default function LandscapeLiveMentoringPage() {
           [우측 패널] 채팅창 및 입력 영역 (p-6 -> p-4)
           ========================================== */}
       <div className="flex flex-col w-1/2 h-full relative">
-        
+
         {/* 채팅 내역 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar z-10">
           {chats.map((chat) => (
@@ -158,13 +158,13 @@ export default function LandscapeLiveMentoringPage() {
 
         {/* 하단 입력 영역 */}
         <div className="shrink-0 p-4 pt-1 relative">
-          
+
           {isPaidMode && (
             <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#FFCC00]/20 to-transparent pointer-events-none z-0 transition-all duration-500"></div>
           )}
 
           <div className="relative z-10 flex flex-col items-end">
-            
+
             {/* AI 질문 추천 토글 버튼 */}
             <button
               onClick={() => setIsAiOpen(!isAiOpen)}
@@ -182,7 +182,7 @@ export default function LandscapeLiveMentoringPage() {
             </button>
 
             {/* AI 질문 추천 박스 (아코디언 애니메이션) */}
-            <div 
+            <div
               className={`w-full bg-[#2A2A2A] border border-gray-700/50 rounded-2xl shadow-lg transition-all duration-300 ease-in-out overflow-hidden flex flex-col
                 ${isAiOpen ? "max-h-48 opacity-100 p-3 mb-3" : "max-h-0 opacity-0 p-0 m-0 border-transparent"}
               `}
@@ -193,7 +193,7 @@ export default function LandscapeLiveMentoringPage() {
                   "2. What should I focus on for my career?",
                   "3. Do you have any feedback on my project?"
                 ].map((item, idx) => (
-                  <li 
+                  <li
                     key={idx}
                     onClick={() => handleSuggestionClick(item)}
                     className="text-[13px] text-gray-300 hover:text-white cursor-pointer transition-colors p-2 rounded-xl hover:bg-gray-700/40 active:bg-gray-700/60"
@@ -214,7 +214,7 @@ export default function LandscapeLiveMentoringPage() {
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 className="w-full bg-[#222222] text-white border border-gray-800 rounded-xl py-3 pl-4 pr-12 focus:outline-none focus:border-[#FFCC00]/50 placeholder-gray-500 text-[14px]"
               />
-              <button 
+              <button
                 onClick={handleSend}
                 className="absolute right-2 p-2 text-[#FFCC00] hover:bg-[#FFCC00]/10 rounded-lg transition-colors active:scale-90"
               >

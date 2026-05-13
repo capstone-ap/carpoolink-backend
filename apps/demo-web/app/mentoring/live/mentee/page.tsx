@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function MenteeLiveIndexPage() {
-  redirect("/mentoring/live");
+  redirect("/mentoring_list/live_list");
 }

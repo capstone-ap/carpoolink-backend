@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { io, Socket } from "socket.io-client"; 
+import { io, Socket } from "socket.io-client";
 import { PhoneOff, Users, Volume2, Settings, Mic, MicOff, Video, VideoOff, MessageSquare, Lock, AlertCircle } from "lucide-react";
 
 import { useMentoringSession } from "@/hooks/useMentoringSession";
@@ -86,10 +86,10 @@ export default function MentorLivePage() {
 
         newSocket.on("connect", () => {
             console.log("✅ Chat socket connected (Mentor - Read Only)");
-            newSocket.emit("join_chat", { 
-                mentoringId, 
-                userId: String(userId), 
-                userName 
+            newSocket.emit("join_chat", {
+                mentoringId,
+                userId: String(userId),
+                userName
             }, (res: any) => {
                 if (res?.ok) {
                     newSocket.emit("get_message_history", { mentoringId, limit: 50, offset: 0 });
@@ -158,7 +158,7 @@ export default function MentorLivePage() {
             }
 
             // 목록으로 이동
-            window.location.href = "/mentoring/live"; 
+            window.location.href = "/mentoring/live";
         } catch (err) {
             console.error("멘토링 종료 실패:", err);
             alert("방송 종료 중 오류가 발생했습니다.");
@@ -176,9 +176,15 @@ export default function MentorLivePage() {
 
     if (error || webRtcError) {
         return (
-            <main className="flex flex-col w-full h-[100dvh] bg-[#161616] text-white items-center justify-center">
-                <div className="bg-red-500/20 p-4 rounded-2xl mb-4"><AlertCircle className="w-8 h-8 text-red-500" /></div>
-                <Link href="/mentoring/live" className="bg-[#FFCC00] text-[#1A1A1A] font-bold px-6 py-3 rounded-xl">목록으로 돌아가기</Link>
+            <main className="flex flex-col w-full h-full bg-[#161616] text-white font-sans overflow-hidden items-center justify-center">
+                <div className="bg-red-500/20 p-4 rounded-2xl mb-4">
+                    <AlertCircle className="w-8 h-8 text-red-500" />
+                </div>
+                {error && <p className="text-red-400 font-bold mb-2">세션 에러: {error}</p>}
+                {webRtcError && <p className="text-red-400 font-bold mb-4">미디어 에러: {webRtcError}</p>}
+                <Link href="/mentoring_list/live_list" className="bg-[#FFCC00] text-[#1A1A1A] font-bold px-6 py-3 rounded-xl hover:bg-[#E6B800]">
+                    목록으로 돌아가기
+                </Link>
             </main>
         );
     }
@@ -279,12 +285,12 @@ export default function MentorLivePage() {
 
                                     return (
                                         <div key={chat.id} className="flex gap-3">
-                                            <img 
-                                                src={profileImage} 
-                                                alt={isMentor ? "멘토 프로필" : "멘티 프로필"} 
-                                                className="w-9 h-9 rounded-full object-cover shrink-0 bg-gray-800 border-2 border-[#FFCC00]" 
+                                            <img
+                                                src={profileImage}
+                                                alt={isMentor ? "멘토 프로필" : "멘티 프로필"}
+                                                className="w-9 h-9 rounded-full object-cover shrink-0 bg-gray-800 border-2 border-[#FFCC00]"
                                             />
-                                            
+
                                             <div className="flex flex-col items-start">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className="text-sm font-semibold text-gray-400">{chat.author}</span>

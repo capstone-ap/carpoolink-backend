@@ -263,7 +263,7 @@ export default function LiveMentoringPage() {
                 </div>
                 {error && <p className="text-red-400 font-bold mb-2">세션 에러: {error}</p>}
                 {webRtcError && <p className="text-red-400 font-bold mb-4">미디어 에러: {webRtcError}</p>}
-                <Link href="/mentoring/live" className="bg-[#FFCC00] text-[#1A1A1A] font-bold px-6 py-3 rounded-xl hover:bg-[#E6B800]">
+                <Link href="/mentoring_list/live_list" className="bg-[#FFCC00] text-[#1A1A1A] font-bold px-6 py-3 rounded-xl hover:bg-[#E6B800]">
                     목록으로 돌아가기
                 </Link>
             </main>

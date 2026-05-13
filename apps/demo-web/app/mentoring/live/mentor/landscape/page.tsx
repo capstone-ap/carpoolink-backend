@@ -19,7 +19,7 @@ export default function MentorLandscapeLivePage() {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
   const [isReading, setIsReading] = useState(false);
-  
+
   const [currentIdx, setCurrentIdx] = useState(0);
 
   const questionQueue: Question[] = [
@@ -76,12 +76,12 @@ export default function MentorLandscapeLivePage() {
 
   return (
     <main className="flex flex-row w-full h-full bg-[#161616] text-white font-sans overflow-hidden relative">
-      
+
       {/* ==========================================
           [좌측 패널] 질문 관리 대시보드
           ========================================== */}
       <div className={`relative flex flex-col h-full bg-[#1A1A1A] border-r border-gray-800/60 transition-all duration-500 ease-in-out ${isChatOpen ? 'w-[55%]' : 'w-full'}`}>
-        
+
         {/* 채팅창이 닫혔을 때 표시되는 좌측 상단 헤더 */}
         {!isChatOpen && (
           <header className="w-full px-5 py-4 shrink-0 border-b border-gray-800/80 bg-[#161616]">
@@ -91,7 +91,7 @@ export default function MentorLandscapeLivePage() {
 
         {/* 💡 핵심 수정 포인트: h-full을 flex-1 overflow-hidden으로 변경하여 하단바 밀림 방지 */}
         <div className="relative z-10 flex flex-col flex-1 overflow-hidden">
-          
+
           {/* 1. 질문 리스트 영역 */}
           <div className="flex-1 overflow-y-auto px-5 pt-6 pb-2 space-y-4 custom-scrollbar">
             {questionQueue.slice(currentIdx, currentIdx + 2).map((q, idx) => {
@@ -101,14 +101,14 @@ export default function MentorLandscapeLivePage() {
                   ${q.type === 'paid' ? (isActive ? 'bg-[#FFCC00] text-[#1A1A1A]' : 'bg-[#E6B800] text-[#1A1A1A] opacity-70') : (isActive ? 'bg-white text-[#1A1A1A]' : 'bg-[#F0F0F0] text-[#1A1A1A] opacity-70')}
                   ${!isActive && 'scale-[0.96] origin-top'}
                 `}>
-                  
+
                   <div className="flex flex-col gap-2 flex-1">
                     <div className="flex items-center justify-between w-full mb-1">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 bg-black/10 rounded-full flex items-center justify-center text-sm">{q.avatar}</div>
                         <span className="font-bold text-[14px]">{q.author}</span>
                       </div>
-                      
+
                       {isActive && q.isPrivate && (
                         <div className="flex items-center gap-1 bg-red-600 text-white text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg shadow-sm">
                           <Lock className="w-3 h-3" strokeWidth={2.5} />
@@ -116,30 +116,30 @@ export default function MentorLandscapeLivePage() {
                         </div>
                       )}
                     </div>
-                    
+
                     <p className={`font-extrabold text-[15px] leading-snug break-keep ${!isActive && 'line-clamp-2'}`}>
                       {q.content}
                     </p>
                   </div>
-                  
+
                   <div className="flex flex-col gap-2 shrink-0 justify-center">
-                    <button 
+                    <button
                       onClick={() => isActive && setIsReading(true)}
                       className={`px-3 py-2.5 rounded-xl text-[12px] font-bold flex items-center justify-center transition-all duration-300
-                        ${!isActive ? 'bg-[#1A1A1A]/5 text-black/30 pointer-events-none' : 
-                          isReading 
-                            ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] ring-2 ring-red-400/50' 
+                        ${!isActive ? 'bg-[#1A1A1A]/5 text-black/30 pointer-events-none' :
+                          isReading
+                            ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] ring-2 ring-red-400/50'
                             : q.type === 'paid' ? 'bg-[#1A1A1A] text-[#FFCC00] hover:bg-black' : 'bg-[#E0E0E0] hover:bg-[#D0D0D0]'
                         }
                       `}
                     >
-                      <Volume2 className={`w-3.5 h-3.5 mr-1.5 ${isReading && isActive ? 'animate-pulse' : ''}`} /> 
+                      <Volume2 className={`w-3.5 h-3.5 mr-1.5 ${isReading && isActive ? 'animate-pulse' : ''}`} />
                       {isReading && isActive ? '읽는 중...' : '질문 읽기'}
                     </button>
-                    <button 
-                      onClick={isActive ? handleNextQuestion : undefined} 
+                    <button
+                      onClick={isActive ? handleNextQuestion : undefined}
                       className={`px-3 py-2.5 rounded-xl text-[12px] font-bold transition-colors 
-                        ${!isActive ? 'bg-[#1A1A1A]/5 text-black/30 pointer-events-none' : 
+                        ${!isActive ? 'bg-[#1A1A1A]/5 text-black/30 pointer-events-none' :
                           q.type === 'paid' ? 'bg-[#1A1A1A]/10 hover:bg-[#1A1A1A]/20' : 'bg-[#E0E0E0] hover:bg-[#D0D0D0]'}
                       `}
                     >
@@ -182,7 +182,7 @@ export default function MentorLandscapeLivePage() {
           [우측 패널] 헤더 및 채팅 영역
           ========================================== */}
       <div className={`flex flex-col h-full bg-[#222222] transition-all duration-500 ease-in-out ${isChatOpen ? 'w-[45%]' : 'w-0 opacity-0 overflow-hidden'}`}>
-        
+
         <header className="w-full px-5 py-4 flex items-center shrink-0 border-b border-gray-800/80 bg-[#1A1A1A]">
           <TopHeader />
         </header>
@@ -224,14 +224,14 @@ export default function MentorLandscapeLivePage() {
               <button onClick={() => setIsExitPopupOpen(false)} className="flex-1 bg-gray-800 text-white text-[14px] font-bold py-3 rounded-xl hover:bg-gray-700 transition-colors">
                 취소
               </button>
-              <Link href="/mentoring/live" className="flex-1 bg-red-600 text-white text-[14px] font-bold py-3 rounded-xl hover:bg-red-700 transition-colors text-center">
+              <Link href="/mentoring_list/live_list" className="flex-1 bg-red-600 text-white text-[14px] font-bold py-3 rounded-xl hover:bg-red-700 transition-colors text-center">
                 종료
               </Link>
             </div>
           </div>
         </div>
       )}
-      
+
     </main>
   );
 }
