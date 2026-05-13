@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation"; 
+
+//import { useSearchParams } from "next/navigation"; 
+import { useParams } from "next/navigation";
+
 import { io, Socket } from "socket.io-client"; 
 import { Users, Send, Sparkles, Star, X, ChevronUp, ChevronDown, AlertCircle, Play } from "lucide-react";
 
-import apiClient from "@/lib/apiClient";
 import { useMentoringSession } from "@/hooks/useMentoringSession";
 import { useWebRtcSession } from "@/hooks/useWebRtcSession";
 
@@ -19,15 +21,12 @@ interface ChatMessage {
 }
 
 export default function LiveMentoringPage() {
-    const searchParams = useSearchParams();
-    const mentoringId = searchParams.get("id"); 
+    const params = useParams();
+    const mentoringId = params?.id as string; 
 
     const [role, setRole] = useState<string>("MENTEE");
     const [userId, setUserId] = useState<number | null>(null);
     const [userName, setUserName] = useState<string>("멘티");
-
-    // 💡 core-api에서 불러올 멘토링 정보 상태
-    const [mentoringInfo, setMentoringInfo] = useState<{ title: string; hostName: string } | null>(null);
 
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -54,25 +53,6 @@ export default function LiveMentoringPage() {
         setUserName(storedName);
     }, []);
 
-    // [core-api] 멘토링 방 정보 조회
-    useEffect(() => {
-        if (!mentoringId) return;
-
-        const fetchMentoringInfo = async () => {
-            try {
-                const res = await apiClient.get(`/api/mentorings/${mentoringId}`);
-                setMentoringInfo({
-                    title: res.data.title || "진행중인 멘토링",
-                    hostName: res.data.hostMentor?.nickname || "멘토",
-                });
-            } catch (err) {
-                console.error("멘토링 정보 로드 실패:", err);
-            }
-        };
-
-        fetchMentoringInfo();
-    }, [mentoringId]);
-
     const { sessionData, isLoading, error, isConnected, peerId, socket: rtcSocket } =
         useMentoringSession({ role, userId: userId ?? 0 });
 
@@ -85,31 +65,43 @@ export default function LiveMentoringPage() {
     });
 
     useEffect(() => {
-        if (!mentoringId || !userId) return;
+    if (!mentoringId || !userId) {
+        console.log("⏳ [채팅] 방 ID 또는 유저 ID가 없어서 연결 대기중...");
+        return;
+    }
 
-        const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || "http://localhost:4001";
+    // 환경 변수 이름 매칭
+    const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4001";
+    console.log("🚀 [채팅] 서버로 연결 시도 중... 주소:", CHAT_SERVER_URL);
+
+    const socket = io(CHAT_SERVER_URL, {
+        path: '/chat/socket.io', 
+        withCredentials: true,
+        transports: ["websocket", "polling"],
+    });
+
+    socket.on("connect", () => {
+        console.log("✅ [채팅] 소켓 연결 완벽 성공!");
         
-        const socket = io(CHAT_SERVER_URL, {
-            withCredentials: true,
-            transports: ["websocket", "polling"],
+        socket.emit("join_chat", { 
+            mentoringId, 
+            userId: String(userId), 
+            userName 
+        }, (res: any) => {
+            if (res?.ok) {
+                console.log("✅ [채팅] 방 입장 완료!");
+                socket.emit("get_message_history", { mentoringId, limit: 50, offset: 0 });
+                socket.emit("get_online_users", { mentoringId });
+            } else {
+                console.error(`❌ [채팅] 방 입장 거부됨: ${res?.error}`);
+            }
         });
+    });
 
-        socket.on("connect", () => {
-            console.log("✅ Chat socket connected");
-            
-            socket.emit("join_chat", { 
-                mentoringId, 
-                userId: String(userId), 
-                userName 
-            }, (res: any) => {
-                if (res?.ok) {
-                    socket.emit("get_message_history", { mentoringId, limit: 50, offset: 0 });
-                    socket.emit("get_online_users", { mentoringId });
-                } else {
-                    alert(`채팅방 입장 실패: ${res?.error}`);
-                }
-            });
-        });
+    // 🚨 디버깅용 콘솔 출력 코드
+    socket.on("connect_error", (err) => {
+        console.error("❌ [채팅] 소켓 연결 실패! 상세 원인:", err.message);
+    });
 
         socket.on("message_history", (messages: any[]) => {
             const mapped = messages.map(m => ({
@@ -179,8 +171,20 @@ export default function LiveMentoringPage() {
         }
     }, [remoteStreams]);
 
+    
     const handleSend = () => {
+        // 1. 버튼이 눌렸는지 확인
+        console.log("👉 [디버그] 전송 버튼 클릭됨! 입력값:", chatInput);
+        
+        // 2. 차단 조건 상태 확인
+        console.log("👉 [디버그] 상태 체크:", { 
+            hasSocket: !!chatSocket, 
+            isSocketConnected: chatSocket?.connected, 
+            isChatClosed 
+        });
+
         if (!chatInput.trim() || !chatSocket || isChatClosed) {
+            console.warn("🚨 [디버그] 차단 조건에 걸려 전송 취소됨!");
             return;
         }
         
@@ -199,6 +203,7 @@ export default function LiveMentoringPage() {
                 content: chatInput 
             };
             
+            console.log("🚀 [디버그] 소켓으로 데이터 발사 payload:", payload); // 3. 발사 직전 확인
             chatSocket.emit("send_message", payload);
             setChatInput(""); 
         }
@@ -274,13 +279,6 @@ export default function LiveMentoringPage() {
 
             {/* 방 정보 및 비디오 송출 영역 */}
             <div className="px-4 shrink-0 z-10 flex flex-col gap-3">
-                {/* 멘토링 방 타이틀 및 호스트 정보 */}
-                {mentoringInfo && (
-                    <div className="flex flex-col px-1">
-                        <h2 className="text-[18px] font-bold text-white leading-tight">{mentoringInfo.title}</h2>
-                        <p className="text-[13px] text-gray-400 mt-1">{mentoringInfo.hostName} 멘토님</p>
-                    </div>
-                )}
                 
                 <div className="w-full aspect-[16/9] bg-gray-800 rounded-2xl relative overflow-hidden flex items-center justify-center">
                     {remoteStreams.size > 0 ? (
