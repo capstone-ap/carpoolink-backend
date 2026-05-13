@@ -93,6 +93,21 @@ export default function PrivateMentoringPage() {
     return () => clearInterval(timerInterval);
   }, []);
 
+  // 💡 [추가] 멘토가 멘토링을 종료하면 멘티 자동 이동
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMentoringEnded = () => {
+      window.location.href = "/mentoring_list/1on1_list";
+    };
+
+    socket.on("mentoring:ended", handleMentoringEnded);
+
+    return () => {
+      socket.off("mentoring:ended", handleMentoringEnded);
+    };
+  }, [socket]);
+
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -116,7 +131,7 @@ export default function PrivateMentoringPage() {
 
   const handleEndMentoring = async () => {
     await endMentoring();
-    window.location.href = "/"; // 종료 후 이동할 경로 (필요시 수정)
+    window.location.href = "/mentoring_list/1on1_list"; // 종료 후 이동할 경로 (필요시 수정)
   };
 
   return (
@@ -149,9 +164,11 @@ export default function PrivateMentoringPage() {
           </span>
         </div>
 
-        <button onClick={() => setIsEndPopupOpen(true)} className="text-red-500 font-bold text-[15px] p-1">
-          종료
-        </button>
+        {role !== "MENTEE" && (
+          <button onClick={() => setIsEndPopupOpen(true)} className="text-red-500 font-bold text-[15px] p-1">
+            종료
+          </button>
+        )}
       </header>
 
       {/* 내부 가변 콘텐츠 영역 */}

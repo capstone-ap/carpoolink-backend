@@ -155,7 +155,12 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     );
                 });
 
-                const transport = device.createSendTransport(transportParams);
+                const transport = device.createSendTransport({
+                    id: transportParams.transportId,
+                    iceParameters: transportParams.iceParameters,
+                    iceCandidates: transportParams.iceCandidates,
+                    dtlsParameters: transportParams.dtlsParameters
+                });
 
                 transport.on("connect", async ({ dtlsParameters }, callback, errback) => {
                     try {
@@ -165,7 +170,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                                 requestId: `connect-send-transport-${Date.now()}`,
                                 action: "connectWebRtcTransport",
                                 data: {
-                                    transportId: transportParams.id,
+                                    transportId: transportParams.transportId,
                                     dtlsParameters,
                                 },
                             },
@@ -188,7 +193,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                                     requestId: `produce-${Date.now()}`,
                                     action: "produce",
                                     data: {
-                                        transportId: transportParams.id,
+                                        transportId: transportParams.transportId,
                                         kind,
                                         rtpParameters,
                                     },
@@ -200,6 +205,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                             );
                         });
 
+                        const serverProducerId = produceParams.producerId || produceParams.id;
                         callback({ id: produceParams.id });
                     } catch (err) {
                         errback(err instanceof Error ? err : new Error(String(err)));
@@ -245,7 +251,12 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     );
                 });
 
-                const transport = device.createRecvTransport(transportParams);
+                const transport = device.createRecvTransport({
+                    id: transportParams.transportId,
+                    iceParameters: transportParams.iceParameters,
+                    iceCandidates: transportParams.iceCandidates,
+                    dtlsParameters: transportParams.dtlsParameters
+                });
 
                 transport.on("connect", async ({ dtlsParameters }, callback, errback) => {
                     try {
@@ -255,7 +266,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                                 requestId: `connect-recv-transport-${Date.now()}`,
                                 action: "connectWebRtcTransport",
                                 data: {
-                                    transportId: transportParams.id,
+                                    transportId: transportParams.transportId,
                                     dtlsParameters,
                                 },
                             },
@@ -381,54 +392,87 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
         [config]
     );
 
-    // 7. Socket 이벤트 수신
-    useEffect(() => {
-        if (!config.socket?.connected) return;
+    // 헬퍼 함수
+    // 💡 [추가] 서버로부터 스트림을 가져와 재생 상태로 만드는 통합 함수
+    const requestConsume = useCallback(async (producerId: string, kind?: string) => {
+        if (!recvTransportRef.current || !deviceRef.current) return;
 
-        const handleSignal = async (message: any) => {
-            try {
-                if (message.event === "new-producer") {
-                    console.log("📢 New producer:", message.data);
-                    // 원격 producer에서 consume 시작
-                    const { producerId, kind } = message.data;
-
-                    const { data: rtpParams } = await new Promise<{ data: any }>((resolve, reject) => {
-                        config.socket?.emit(
-                            "signal",
-                            {
-                                requestId: `consume-${Date.now()}`,
-                                action: "consume",
-                                data: { producerId, rtpCapabilities: deviceRef.current?.rtpCapabilities },
-                            },
-                            (response: any) => {
-                                if (response?.ok) resolve(response);
-                                else reject(new Error(response?.error));
-                            }
-                        );
-                    });
-
-                    if (recvTransportRef.current) {
-                        await consume(rtpParams.id, producerId, kind, rtpParams.rtpParameters, recvTransportRef.current);
+        try {
+            const { data: rtpParams } = await new Promise<{ data: any }>((resolve, reject) => {
+                config.socket?.emit(
+                    "signal",
+                    {
+                        requestId: `consume-${Date.now()}`,
+                        action: "consume",
+                        data: {
+                            producerId,
+                            rtpCapabilities: deviceRef.current?.rtpCapabilities,
+                            transportId: recvTransportRef.current?.id // 🚨 핵심 고침: transportId 추가!
+                        },
+                    },
+                    (response: any) => {
+                        if (response?.ok) resolve(response);
+                        else reject(new Error(response?.error));
                     }
-                }
-            } catch (err) {
-                console.error("Signal 처리 오류:", err);
-            }
-        };
+                );
+            });
 
-        config.socket.on("signal", handleSignal);
-        return () => {
-            config.socket?.off("signal", handleSignal);
-        };
+            // 7. Socket 이벤트 수신
+            useEffect(() => {
+                if (!config.socket?.connected) return;
+
+                const handleSignal = async (message: any) => {
+                    try {
+                        if (message.event === "new-producer") {
+                            console.log("📢 New producer:", message.data);
+                            const { producerId, kind } = message.data;
+
+                            // 💡 [수정] 위에서 만든 통합 헬퍼 함수를 호출합니다.
+                            await requestConsume(producerId, kind);
+                        }
+                    } catch (err) {
+                        console.error("Signal 처리 오류:", err);
+                    }
+                };
+
+                config.socket.on("signal", handleSignal);
+                return () => {
+                    config.socket?.off("signal", handleSignal);
+                };
+            }, [config.socket, requestConsume]);
+
+            // 내부 consume 함수 호출 (기존 6번)
+            await consume(
+                rtpParams.id,
+                producerId,
+                rtpParams.kind || kind,
+                rtpParams.rtpParameters,
+                recvTransportRef.current
+            );
+
+            // 🚨 핵심 고침: Mediasoup의 paused 상태를 해제하기 위해 resume 호출
+            config.socket?.emit("signal", {
+                requestId: `resume-${Date.now()}`,
+                action: "resumeConsumer",
+                data: { consumerId: rtpParams.id }
+            });
+            console.log(`✅ Resumed consumer: ${rtpParams.id}`);
+
+        } catch (err) {
+            console.error("Failed to consume remote stream:", err);
+        }
     }, [config.socket, consume]);
 
     // 8. 초기화
+    const isGroupMentee = config.role === "MENTEE" && config.mentoringType === "GROUP";
     useEffect(() => {
+        if (isGroupMentee) return;
+
         if (!localStream && !isInitializingRef.current) {
             console.log("Initializing WebRTC session...");
             initLocalStream();
         }
-    }, [initLocalStream, localStream]);
+    }, [initLocalStream, localStream, isGroupMentee]);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -461,7 +505,6 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                 // 2. Mediasoup 장치 및 트랜스포트 생성 (송/수신 공통)
                 const device = await initDevice();
                 const sendTransport = await createSendTransport(device);
-                const recvTransport = await createRecvTransport(device);
 
                 // 3. 송출(Produce) 로직
                 // localStream이 존재할 때만 실행되도록 if문으로 감싸 타입을 확정합니다.
@@ -479,6 +522,30 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                 } else {
                     // 1:N 멘티의 경우 localStream이 없으므로 송출 로직을 건너뜁니다.
                     console.log("ℹ️ 1:N Mentee mode: Skipping production");
+                }
+
+                const { data: producerIds } = await new Promise<{ data: any[] }>((resolve, reject) => {
+                    config.socket?.emit(
+                        "signal",
+                        {
+                            requestId: `list-producers-${Date.now()}`,
+                            action: "listProducers",
+                            data: {}
+                        },
+                        (response: any) => {
+                            if (response?.ok) resolve(response);
+                            else reject(new Error(response?.error));
+                        }
+                    );
+                });
+
+                if (producerIds && producerIds.length > 0) {
+                    console.log("📥 Found existing producers:", producerIds);
+                    for (const p of producerIds) {
+                        const pid = typeof p === 'string' ? p : p.producerId;
+                        const pkind = typeof p === 'string' ? undefined : p.kind;
+                        await requestConsume(pid, pkind);
+                    }
                 }
 
                 if (isMountedRef.current) {
