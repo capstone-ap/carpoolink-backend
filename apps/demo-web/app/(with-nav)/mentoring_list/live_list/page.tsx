@@ -7,6 +7,8 @@ import { Search, ChevronDown, Users, Check, AlertCircle, Plus, ChevronLeft } fro
 
 import apiClient from "@/lib/apiClient";
 
+import axios from "axios";
+
 // 💡 상단 카테고리 정의
 const CATEGORIES = ["전체", "업무", "일상", "보상", "성장", "커리어", "업계", "멘탈", "실전", "기타"];
 
@@ -121,11 +123,17 @@ function LiveListContent() {
     if (!isValidTitle || isSubmitting) return;
     setIsSubmitting(true);
     try {
+      const currentUserId = localStorage.getItem("userId"); // 로그인한 유저 ID 가져오기
+
       const res = await apiClient.post("/media/mentorings/start", {
         title: titleInput.trim(),
         isGroup: true,
         hasCamera: true,
         hasMicrophone: true,
+      }, {
+        headers:{
+          'x-user-id': currentUserId // 미디어 서버가 요구하는 필수 식별값 추가
+        }
       });
       const createdMentoringId = res.data?.mentoring?.mentoringId;
       setIsDrawerOpen(false);
