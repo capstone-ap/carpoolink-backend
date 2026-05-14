@@ -184,7 +184,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     }
                 });
 
-                transport.on("produce", async ({ kind, rtpParameters }, callback, errback) => {
+                transport.on("produce", async ({ kind, rtpParameters, appData }, callback, errback) => {
                     try {
                         const { data: produceParams } = await new Promise<{ data: any }>((resolve, reject) => {
                             config.socket?.emit(
@@ -196,6 +196,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                                         transportId: transportParams.transportId,
                                         kind,
                                         rtpParameters,
+                                        appData
                                     },
                                 },
                                 (response: any) => {
@@ -206,7 +207,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                         });
 
                         const serverProducerId = produceParams.producerId || produceParams.id;
-                        callback({ id: produceParams.id });
+                        callback({ id: serverProducerId });
                     } catch (err) {
                         errback(err instanceof Error ? err : new Error(String(err)));
                     }
@@ -423,7 +424,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
 
             // 내부 consume 함수 호출 (기존 6번)
             await consume(
-                rtpParams.id,
+                rtpParams.consumerId,
                 producerId,
                 rtpParams.kind || kind,
                 rtpParams.rtpParameters,
@@ -434,9 +435,9 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
             config.socket?.emit("signal", {
                 requestId: `resume-${Date.now()}`,
                 action: "resumeConsumer",
-                data: { consumerId: rtpParams.id }
+                data: { consumerId: rtpParams.consumerId }
             });
-            console.log(`✅ Resumed consumer: ${rtpParams.id}`);
+            console.log(`✅ Resumed consumer: ${rtpParams.consumerId}`);
 
         } catch (err) {
             console.error("Failed to consume remote stream:", err);
