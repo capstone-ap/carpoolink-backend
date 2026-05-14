@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-
-//import { useSearchParams } from "next/navigation";
 import { useParams } from "next/navigation";
+
+// 💡 프로젝트 환경에 맞게 apiClient 경로를 확인해주세요. (예: "@/lib/apiClient" 또는 "@/api/client")
+import apiClient from "@/lib/apiClient"; 
 
 import { io, Socket } from "socket.io-client";
 import { Users, Send, Sparkles, Star, X, ChevronUp, ChevronDown, AlertCircle, Play } from "lucide-react";
@@ -20,14 +21,91 @@ interface ChatMessage {
     content: string;
 }
 
+// ============================================================================
+// [Wrapper 컴포넌트] 로딩 화면 & 방 입장 기록(History) 생성 게이트웨이
+// ============================================================================
 export default function LiveMentoringPage() {
     const params = useParams();
     const mentoringId = params?.id as string;
 
+    const [isReady, setIsReady] = useState(false);
+    const [joinError, setJoinError] = useState<string | null>(null);
+
     const [role, setRole] = useState<string>("MENTEE");
     const [userId, setUserId] = useState<number | null>(null);
-    const [userName, setUserName] = useState<string>("멘티");
+    const [userName, setUserName] = useState<string>("익명멘티");
 
+    useEffect(() => {
+        const initAndJoin = async () => {
+            // 로컬스토리지에서 유저 정보 가져오기
+            const storedRole = localStorage.getItem("role")?.toUpperCase() || "MENTEE";
+            const storedUserId = localStorage.getItem("userId");
+            const storedName = localStorage.getItem("nickname") || "익명멘티";
+
+            setRole(storedRole);
+            setUserName(storedName);
+
+            if (storedUserId) {
+                const parsedUserId = Number(storedUserId);
+                setUserId(parsedUserId);
+
+                try {
+                    await apiClient.post(`/api/mentorings/${mentoringId}/join`);
+                    
+                    // 성공 시 진짜 방 화면으로 전환
+                    setIsReady(true);
+                } catch (err) {
+                    console.error("방 입장 API 실패:", err);
+                    setJoinError("방 입장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+                }
+            } else {
+                setJoinError("로그인이 필요한 서비스입니다.");
+            }
+        };
+
+        if (mentoringId) {
+            initAndJoin();
+        }
+    }, [mentoringId]);
+
+    // 입장 실패 시 보여줄 에러 화면
+    if (joinError) {
+        return (
+            <main className="flex flex-col w-full h-[100dvh] bg-[#161616] text-white items-center justify-center">
+                <div className="bg-red-500/20 p-4 rounded-2xl mb-4">
+                    <AlertCircle className="w-8 h-8 text-red-500" />
+                </div>
+                <p className="text-red-400 font-bold mb-6">{joinError}</p>
+                <Link href="/mentoring_list/live_list" className="bg-[#FFCC00] text-[#1A1A1A] font-bold px-6 py-3 rounded-xl hover:bg-[#E6B800]">
+                    목록으로 돌아가기
+                </Link>
+            </main>
+        );
+    }
+
+    // API 응답을 기다리는 동안 보여줄 로딩 화면 (웹소켓 연결 시도 전)
+    if (!isReady || !userId) {
+        return (
+            <main className="flex flex-col w-full h-[100dvh] bg-[#161616] text-white items-center justify-center space-y-5">
+                <div className="w-12 h-12 border-4 border-[#FFCC00]/20 border-t-[#FFCC00] rounded-full animate-spin"></div>
+                <div className="text-center space-y-1.5">
+                    <h2 className="text-xl font-bold text-gray-200 tracking-tight">멘토링 방을 준비 중입니다...</h2>
+                    <p className="text-gray-400 text-sm">안전한 통신을 위해 입장 권한을 확인하고 있습니다.</p>
+                </div>
+            </main>
+        );
+    }
+
+    // DB 기록 생성 완료 후 소켓 통신을 시작하는 컴포넌트 마운트
+    return <LiveMentoringContent mentoringId={mentoringId} role={role} userId={userId} userName={userName} />;
+}
+
+
+// ============================================================================
+// [실제 화면 컴포넌트] 소켓 연결, 화상 미디어, 채팅 UI 담당
+// ============================================================================
+function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentoringId: string, role: string, userId: number, userName: string }) {
+    
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -42,35 +120,18 @@ export default function LiveMentoringPage() {
     const [onlineUserCount, setOnlineUserCount] = useState<number>(0);
     const [isChatClosed, setIsChatClosed] = useState(false);
 
-    useEffect(() => {
-        const storedRole = localStorage.getItem("role")?.toUpperCase();
-        if (storedRole) setRole(storedRole);
-
-        const storedUserId = localStorage.getItem("userId");
-        if (storedUserId) setUserId(Number(storedUserId));
-
-        const storedName = localStorage.getItem("nickname") || "익명멘티";
-        setUserName(storedName);
-    }, []);
-
     const { sessionData, isLoading, error, isConnected, peerId, socket: rtcSocket } =
-        useMentoringSession({ role, userId: userId ?? 0 });
+        useMentoringSession({ role, userId });
 
     const { remoteStreams, error: webRtcError } = useWebRtcSession({
         socket: rtcSocket,
-        mentoringId: mentoringId || "",
+        mentoringId,
         peerId: peerId || "",
         role,
         mentoringType: "GROUP"
     });
 
     useEffect(() => {
-        if (!mentoringId || !userId) {
-            console.log("⏳ [채팅] 방 ID 또는 유저 ID가 없어서 연결 대기중...");
-            return;
-        }
-
-        // 환경 변수 이름 매칭
         const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4001";
         console.log("🚀 [채팅] 서버로 연결 시도 중... 주소:", CHAT_SERVER_URL);
 
@@ -98,7 +159,6 @@ export default function LiveMentoringPage() {
             });
         });
 
-        // 🚨 디버깅용 콘솔 출력 코드
         socket.on("connect_error", (err) => {
             console.error("❌ [채팅] 소켓 연결 실패! 상세 원인:", err.message);
         });
@@ -149,7 +209,7 @@ export default function LiveMentoringPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chats]);
 
-    // 💡 [추가] 멘토가 라이브 멘토링을 종료하면 멘티 자동 이동
+    // 멘토가 라이브 멘토링을 종료하면 멘티 자동 이동
     useEffect(() => {
         if (!rtcSocket) return;
 
@@ -186,22 +246,8 @@ export default function LiveMentoringPage() {
         }
     }, [remoteStreams]);
 
-
     const handleSend = () => {
-        // 1. 버튼이 눌렸는지 확인
-        console.log("👉 [디버그] 전송 버튼 클릭됨! 입력값:", chatInput);
-
-        // 2. 차단 조건 상태 확인
-        console.log("👉 [디버그] 상태 체크:", {
-            hasSocket: !!chatSocket,
-            isSocketConnected: chatSocket?.connected,
-            isChatClosed
-        });
-
-        if (!chatInput.trim() || !chatSocket || isChatClosed) {
-            console.warn("🚨 [디버그] 차단 조건에 걸려 전송 취소됨!");
-            return;
-        }
+        if (!chatInput.trim() || !chatSocket || isChatClosed) return;
 
         if (chatInput.length > 200) {
             alert("메시지는 최대 200자까지만 입력할 수 있습니다.");
@@ -217,8 +263,6 @@ export default function LiveMentoringPage() {
                 userName,
                 content: chatInput
             };
-
-            console.log("🚀 [디버그] 소켓으로 데이터 발사 payload:", payload); // 3. 발사 직전 확인
             chatSocket.emit("send_message", payload);
             setChatInput("");
         }
@@ -246,18 +290,18 @@ export default function LiveMentoringPage() {
         setIsAiOpen(false);
     };
 
-    if (isLoading || !userId) {
+    if (isLoading) {
         return (
-            <main className="flex flex-col w-full h-full bg-[#161616] text-white items-center justify-center">
+            <main className="flex flex-col w-full h-[100dvh] bg-[#161616] text-white items-center justify-center">
                 <div className="w-8 h-8 border-4 border-[#FFCC00]/30 border-t-[#FFCC00] rounded-full animate-spin mb-4"></div>
-                <p className="text-gray-300">멘토링 세션 연결 중...</p>
+                <p className="text-gray-300">미디어 세션 연결 중...</p>
             </main>
         );
     }
 
     if (error || webRtcError) {
         return (
-            <main className="flex flex-col w-full h-full bg-[#161616] text-white items-center justify-center">
+            <main className="flex flex-col w-full h-[100dvh] bg-[#161616] text-white items-center justify-center">
                 <div className="bg-red-500/20 p-4 rounded-2xl mb-4">
                     <AlertCircle className="w-8 h-8 text-red-500" />
                 </div>
@@ -272,7 +316,6 @@ export default function LiveMentoringPage() {
 
     return (
         <main className="flex flex-col w-full h-[100dvh] bg-[#161616] text-white relative font-sans overflow-hidden">
-
             <header className="w-full px-5 py-4 flex items-center justify-between shrink-0 z-10">
                 <Link href="/mentoring_list/live_list" className="inline-flex items-center hover:opacity-80 transition-opacity">
                     <img src="/icons/arrow.svg" alt="화살표 아이콘" className="w-5 h-5 mr-2 text-[#FFCC00]" />
@@ -292,9 +335,7 @@ export default function LiveMentoringPage() {
                 </div>
             </header>
 
-            {/* 방 정보 및 비디오 송출 영역 */}
             <div className="px-4 shrink-0 z-10 flex flex-col gap-3">
-
                 <div className="w-full aspect-[16/9] bg-gray-800 rounded-2xl relative overflow-hidden flex items-center justify-center">
                     {remoteStreams.size > 0 ? (
                         <>
@@ -375,7 +416,6 @@ export default function LiveMentoringPage() {
                 {isPaidMode && <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#FFCC00]/30 to-transparent pointer-events-none z-0 transition-all duration-500"></div>}
 
                 <div className="relative z-10 flex flex-col items-end">
-
                     {!isChatClosed && (
                         <>
                             <button onClick={() => setIsAiOpen(!isAiOpen)} className="flex items-center gap-1.5 px-3 py-1.5 mb-2 bg-[#222222] border border-gray-700/50 rounded-full shadow-md hover:bg-gray-800 transition-colors active:scale-95">
