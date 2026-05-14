@@ -81,6 +81,8 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
                 serverUrl,
                 {
                     path: "/media/socket.io",
+                    withCredentials: true,
+                    transports: ["websocket", "polling"],
                     reconnection: true,
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
