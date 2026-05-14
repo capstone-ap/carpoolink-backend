@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 // 💡 프로젝트 환경에 맞게 apiClient 경로를 확인해주세요. (예: "@/lib/apiClient" 또는 "@/api/client")
-import apiClient from "@/lib/apiClient"; 
+import apiClient from "@/lib/apiClient";
 
 import { io, Socket } from "socket.io-client";
 import { Users, Send, Sparkles, Star, X, ChevronUp, ChevronDown, AlertCircle, Play } from "lucide-react";
@@ -51,7 +51,7 @@ export default function LiveMentoringPage() {
 
                 try {
                     await apiClient.post(`/api/mentorings/${mentoringId}/join`);
-                    
+
                     // 성공 시 진짜 방 화면으로 전환
                     setIsReady(true);
                 } catch (err) {
@@ -105,8 +105,7 @@ export default function LiveMentoringPage() {
 // [실제 화면 컴포넌트] 소켓 연결, 화상 미디어, 채팅 UI 담당
 // ============================================================================
 function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentoringId: string, role: string, userId: number, userName: string }) {
-    
-    const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const [isPaidMode, setIsPaidMode] = useState(false);
@@ -224,28 +223,6 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
         };
     }, [rtcSocket]);
 
-    useEffect(() => {
-        if (remoteVideoRef.current && remoteStreams.size > 0) {
-            const combinedStream = new MediaStream();
-            remoteStreams.forEach((stream) => {
-                stream.getTracks().forEach((track) => {
-                    if (!combinedStream.getTracks().find(t => t.id === track.id)) {
-                        combinedStream.addTrack(track);
-                    }
-                });
-            });
-
-            if (combinedStream.getTracks().length > 0) {
-                remoteVideoRef.current.srcObject = combinedStream;
-                remoteVideoRef.current.play().catch((err) => {
-                    if (err.name === "NotAllowedError" || err.message.includes("play() failed")) {
-                        setIsAutoplayBlocked(true);
-                    }
-                });
-            }
-        }
-    }, [remoteStreams]);
-
     const handleSend = () => {
         if (!chatInput.trim() || !chatSocket || isChatClosed) return;
 
@@ -339,12 +316,28 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
                 <div className="w-full aspect-[16/9] bg-gray-800 rounded-2xl relative overflow-hidden flex items-center justify-center">
                     {remoteStreams.size > 0 ? (
                         <>
-                            <video ref={remoteVideoRef} className="absolute inset-0 w-full h-full object-cover" autoPlay playsInline />
+                            {Array.from(remoteStreams.entries()).map(([id, stream]) => (
+                                <MediaRenderer
+                                    key={id}
+                                    stream={stream}
+                                    onBlocked={() => setIsAutoplayBlocked(true)}
+                                />
+                            ))}
+
                             {isAutoplayBlocked && (
                                 <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-20 backdrop-blur-sm">
-                                    <p className="text-white mb-3 text-sm font-medium">오디오 정책으로 인해 영상이 일시정지되었습니다.</p>
-                                    <button onClick={() => { remoteVideoRef.current?.play(); setIsAutoplayBlocked(false); }} className="bg-[#FFCC00] text-[#1A1A1A] font-bold px-6 py-2.5 rounded-full flex items-center gap-2 active:scale-95 transition-transform shadow-lg">
-                                        <Play className="w-4 h-4" fill="currentColor" /> 화면 재생하기
+                                    <p className="text-white mb-3 text-sm font-medium">오디오 정책으로 인해 미디어가 일시정지되었습니다.</p>
+                                    <button
+                                        onClick={() => {
+                                            // 화면 내의 모든 미디어 요소를 강제로 재생시킵니다
+                                            document.querySelectorAll('video, audio').forEach(el => {
+                                                (el as HTMLMediaElement).play().catch(console.error);
+                                            });
+                                            setIsAutoplayBlocked(false);
+                                        }}
+                                        className="bg-[#FFCC00] text-[#1A1A1A] font-bold px-6 py-2.5 rounded-full flex items-center gap-2 active:scale-95 transition-transform shadow-lg"
+                                    >
+                                        <Play className="w-4 h-4" fill="currentColor" /> 미디어 재생하기
                                     </button>
                                 </div>
                             )}
@@ -476,4 +469,31 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
             )}
         </main>
     );
+}
+
+// ============================================================================
+// [미디어 렌더러 컴포넌트] 비디오와 오디오를 구분하여 안전하게 재생
+// ============================================================================
+function MediaRenderer({ stream, onBlocked }: { stream: MediaStream, onBlocked: () => void }) {
+    const mediaRef = useRef<HTMLMediaElement>(null);
+    // 이 스트림이 비디오 트랙을 가졌는지 확인
+    const isVideo = stream.getVideoTracks().length > 0;
+
+    useEffect(() => {
+        if (mediaRef.current && stream) {
+            mediaRef.current.srcObject = stream;
+            mediaRef.current.play().catch((err) => {
+                if (err.name === "NotAllowedError" || err.message.includes("play() failed")) {
+                    onBlocked();
+                }
+            });
+        }
+    }, [stream, onBlocked]);
+
+    if (isVideo) {
+        return <video ref={mediaRef as any} className="absolute inset-0 w-full h-full object-cover" autoPlay playsInline />;
+    } else {
+        // 오디오는 화면을 차지하지 않도록 숨김 처리
+        return <audio ref={mediaRef as any} autoPlay playsInline className="hidden" />;
+    }
 }

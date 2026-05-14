@@ -258,6 +258,10 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     dtlsParameters: transportParams.dtlsParameters
                 });
 
+                transport.on("connectionstatechange", (state) => {
+                    console.log("🚨 Recv transport state:", state);
+                });
+
                 transport.on("connect", async ({ dtlsParameters }, callback, errback) => {
                     try {
                         config.socket?.emit(
