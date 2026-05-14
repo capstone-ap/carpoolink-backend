@@ -506,6 +506,8 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                 const device = await initDevice();
                 const sendTransport = await createSendTransport(device);
 
+                await createRecvTransport(device);
+
                 // 3. 송출(Produce) 로직
                 // localStream이 존재할 때만 실행되도록 if문으로 감싸 타입을 확정합니다.
                 if (localStream) {
