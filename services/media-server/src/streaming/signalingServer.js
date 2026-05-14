@@ -137,12 +137,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
 
                         socketContext.set(socket.id, { mentoringId, peerId, role, userId });
 
-                        sendReply(socket, requestId, {
-                            peerId,
-                            ...joinResult,
-                            audioPipeline: audioPipeline.getRoomSnapshot(mentoringId)
-                        });
-
                         notifyPeers(
                             mentoringId,
                             'peer-joined',
@@ -166,7 +160,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             throw new Error('멘토링 세션이 존재하지 않습니다.');
                         }
 
-                        sendReply(socket, requestId, room.router.rtpCapabilities);
                         result = room.router.rtpCapabilities;
                         break;
                     }
@@ -183,7 +176,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             direction: data.direction ?? 'recv'
                         });
 
-                        sendReply(socket, requestId, transport);
                         result = transport;
                         break;
                     }
@@ -201,7 +193,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             dtlsParameters: data.dtlsParameters
                         });
 
-                        sendReply(socket, requestId, { connected: true });
                         result = { connected: true };
                         break;
                     }
@@ -220,8 +211,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             rtpParameters: data.rtpParameters,
                             appData: data.appData
                         });
-
-                        sendReply(socket, requestId, produced);
 
                         notifyPeers(
                             context.mentoringId,
@@ -263,7 +252,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             rtpCapabilities: data.rtpCapabilities
                         });
 
-                        sendReply(socket, requestId, consumed);
                         result = consumed;
                         break;
                     }
@@ -280,7 +268,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             consumerId: data.consumerId
                         });
 
-                        sendReply(socket, requestId, { resumed: true });
                         result = { resumed: true };
                         break;
                     }
@@ -296,7 +283,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             context.peerId
                         );
 
-                        sendReply(socket, requestId, producerIds);
                         result = producerIds;
                         break;
                     }
@@ -313,10 +299,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             metadata: data.metadata ?? null
                         });
 
-                        sendReply(socket, requestId, {
-                            queued: true,
-                            message: 'TTS request queued; attach a tts-bot audio producer to inject actual synthesized audio'
-                        });
                         result = {
                             queued: true,
                             message: 'TTS request queued; attach a tts-bot audio producer to inject actual synthesized audio'
@@ -344,7 +326,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                         );
 
                         socketContext.delete(socket.id);
-                        sendReply(socket, requestId, { left: true });
                         result = { left: true };
                         break;
                     }

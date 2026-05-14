@@ -106,7 +106,8 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     if (res?.ok) {
                         resolve(res);
                     } else {
-                        reject(new Error(res?.error || `서버 에러 발생: ${JSON.stringify(res)}`));
+                        const errorMsg = res?.error || "Unknown server error";
+                        reject(new Error(errorMsg));
                     }
                 });
             });
