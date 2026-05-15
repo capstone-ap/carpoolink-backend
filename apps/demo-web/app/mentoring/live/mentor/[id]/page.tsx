@@ -26,79 +26,58 @@ interface ChatMessage {
     content: string;
 }
 
-// ============================================================================
-// [Wrapper 컴포넌트] 사용자 정보(localStorage)가 준비될 때까지 대기
-// ============================================================================
+// 1. 게이트웨이 컴포넌트: 정보가 준비될 때까지 로딩만 보여줌
 export default function MentorLivePage() {
     const params = useParams();
     const mentoringId = params?.id as string;
 
     const [isReady, setIsReady] = useState(false);
-    const [role, setRole] = useState<string>("MENTOR");
     const [userId, setUserId] = useState<number | null>(null);
+    const [role, setRole] = useState<string>("MENTOR");
     const [userName, setUserName] = useState<string>("멘토");
 
     useEffect(() => {
-        // 1. 로컬스토리지에서 멘토 정보 확정 (멘티 페이지의 initAndJoin 로직과 유사)
+        // 로컬스토리지 정보 확정
         const storedRole = localStorage.getItem("role")?.toUpperCase() || "MENTOR";
         const storedUserId = localStorage.getItem("userId");
         const storedName = localStorage.getItem("nickname") || "멘토";
 
-        setRole(storedRole);
-        setUserName(storedName);
-
         if (storedUserId) {
+            setRole(storedRole);
             setUserId(Number(storedUserId));
-            setIsReady(true); // 정보 로드 완료 시에만 다음 단계로 이동
-        } else {
-            // 멘토인데 ID가 없는 경우 예외 처리
-            console.error("멘토 ID를 찾을 수 없습니다.");
+            setUserName(storedName);
+            setIsReady(true); // 모든 정보가 준비되었을 때만 true
         }
     }, []);
 
-    // 정보를 읽어오는 동안 보여줄 로딩 화면 (멘티 페이지 로딩 UI와 통일)
     if (!isReady || !userId) {
         return (
             <main className="flex flex-col w-full h-[100dvh] bg-[#161616] text-white items-center justify-center space-y-5">
                 <div className="w-12 h-12 border-4 border-[#FFCC00]/20 border-t-[#FFCC00] rounded-full animate-spin"></div>
-                <div className="text-center space-y-1.5">
-                    <h2 className="text-xl font-bold text-gray-200 tracking-tight">방송 세션을 준비 중입니다...</h2>
-                    <p className="text-gray-400 text-sm">최종 권한을 확인하고 미디어 서버에 연결합니다.</p>
-                </div>
+                <p className="text-gray-400">방송 세션을 준비 중입니다...</p>
             </main>
         );
     }
 
-    // 정보가 확정된 후에만 실제 소켓/WebRTC 로직이 있는 컴포넌트 마운트
+    // 💡 정보가 확정된 후, 실제 소켓 로직이 있는 Content 컴포넌트 실행
     return <MentorLiveContent mentoringId={mentoringId} role={role} userId={userId} userName={userName} />;
 }
 
-
-// ============================================================================
-// [실제 화면 컴포넌트] 소켓 연결 및 WebRTC 로직 (참조값 고정)
-// ============================================================================
+// 2. 실제 화면 컴포넌트: 여기서 훅을 호출해야 소켓이 단 한 번만 연결됨
 function MentorLiveContent({ mentoringId, role, userId, userName }: { mentoringId: string, role: string, userId: number, userName: string }) {
-
     const videoRef = useRef<HTMLVideoElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    const [chats, setChats] = useState<any[]>([]);
+    const [onlineUserCount, setOnlineUserCount] = useState(0);
     const [isChatOpen, setIsChatOpen] = useState(true);
     const [isExitPopupOpen, setIsExitPopupOpen] = useState(false);
-    const [isReading, setIsReading] = useState(false);
     const [currentIdx, setCurrentIdx] = useState(0);
+    const [isReading, setIsReading] = useState(false);
 
-    const [chatSocket, setChatSocket] = useState<Socket | null>(null);
-    const [chats, setChats] = useState<ChatMessage[]>([]);
-    const [onlineUserCount, setOnlineUserCount] = useState<number>(0);
-
-    // 💡 훅에 넘겨주는 옵션들을 useMemo로 고정 (무한 루프 방지 핵심)
-    const mentoringOptions = useMemo(() => ({
-        role,
-        userId,
-    }), [role, userId]);
-
-    const { sessionData, isLoading, error, isConnected, peerId, socket, endMentoring } =
-        useMentoringSession(mentoringOptions); // 이제 정보가 확실하므로 isInitialized 가드 불필요
+    // 💡 이제 이 훅들은 컴포넌트가 마운트될 때 단 한 번, 올바른 userId로 실행됩니다.
+    const mentoringOptions = useMemo(() => ({ role, userId }), [role, userId]);
+    const { sessionData, isConnected, peerId, socket, endMentoring, isLoading, error } = useMentoringSession(mentoringOptions);
 
     const webRtcConfig = useMemo(() => ({
         socket,
@@ -108,8 +87,7 @@ function MentorLiveContent({ mentoringId, role, userId, userName }: { mentoringI
         mentoringType: "GROUP" as const
     }), [socket, sessionData?.mentoringId, mentoringId, peerId]);
 
-    const { localStream, isCameraOn, isMicOn, setCameraOn, setMicOn, error: webRtcError } =
-        useWebRtcSession(webRtcConfig);
+    const { localStream, isCameraOn, isMicOn, setCameraOn, setMicOn, error: webRtcError } = useWebRtcSession(webRtcConfig);
 
     // 질문 큐 데이터
     const questionQueue: Question[] = [
@@ -167,8 +145,6 @@ function MentorLiveContent({ mentoringId, role, userId, userName }: { mentoringI
         newSocket.on("user_joined", (data: any) => setOnlineUserCount(data.userCount));
         newSocket.on("user_left", (data: any) => setOnlineUserCount(data.userCount));
         newSocket.on("online_users", (data: any) => setOnlineUserCount(data.userCount));
-
-        setChatSocket(newSocket);
 
         return () => {
             newSocket.emit("leave_chat", { mentoringId, userId: String(userId), userName });
