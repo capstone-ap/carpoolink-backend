@@ -46,8 +46,15 @@ export default function MentorLivePage() {
     const [chats, setChats] = useState<ChatMessage[]>([]);
     const [onlineUserCount, setOnlineUserCount] = useState<number>(0);
 
+    const [isInitialized, setIsInitialized] = useState(false);
+
+    const mentoringOptions = useMemo(() => ({
+        role,
+        userId: userId || 0,
+    }), [role, userId]);
+
     const { sessionData, isLoading, error, isConnected, peerId, socket, endMentoring } =
-        useMentoringSession({ role, userId: userId || 0 });
+        useMentoringSession(isInitialized ? mentoringOptions : { role: "MENTOR", userId: 0 });
 
     const webRtcConfig = useMemo(() => ({
         socket,
@@ -75,6 +82,8 @@ export default function MentorLivePage() {
         if (storedUserId) setUserId(Number(storedUserId));
         const storedName = localStorage.getItem("nickname") || "멘토";
         setUserName(storedName);
+
+        setIsInitialized(true);
     }, []);
 
     useEffect(() => {
@@ -142,8 +151,10 @@ export default function MentorLivePage() {
 
     useEffect(() => {
         if (videoRef.current && localStream) {
-            videoRef.current.srcObject = localStream;
-            videoRef.current.play().catch(console.error);
+            if (videoRef.current.srcObject !== localStream) {
+                videoRef.current.srcObject = localStream;
+                videoRef.current.play().catch(console.error);
+            }
         }
     }, [localStream, isCameraOn]);
 

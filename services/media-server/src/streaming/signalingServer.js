@@ -149,6 +149,7 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                         break;
                     }
                     case 'getRtpCapabilities': {
+                        console.log('getRtpCapabilities called');
                         const context = socketContext.get(socket.id);
 
                         if (!context) {
@@ -161,6 +162,7 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                         }
 
                         result = JSON.parse(JSON.stringify(room.router.rtpCapabilities));
+                        console.log('Returning RTP Capabilities:', result);
                         break;
                     }
                     case 'createWebRtcTransport': {
@@ -340,11 +342,12 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                 }
             } catch (error) {
                 console.error('Signaling error:', error);
+                const errorMessage = error instanceof Error ? error.message : String(error);
 
                 if (typeof callback === 'function') {
-                    callback({ ok: false, error: error?.message ?? 'Unhandled signaling error' });
+                    callback({ ok: false, error: errorMessage });
                 } else {
-                    sendError(socket, requestId, error);
+                    sendError(socket, requestId, { message: errorMessage });
                 }
             }
         });

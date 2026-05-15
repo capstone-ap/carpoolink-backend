@@ -121,13 +121,13 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
             return device;
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : "Device 초기화 실패";
-            console.error("❌ Device init error:", err);
+            console.error("❌ Device init error:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
             if (isMountedRef.current) {
                 setError(errorMsg);
             }
             throw err;
         }
-    }, [config.socket]);
+    }, [config.socket?.id, config.peerId, localStream]);
 
     // 3. Send Transport 생성
     const createSendTransport = (device: Device): Promise<MediaSoupTypes.Transport> => {
@@ -429,7 +429,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
 
         const init = async () => {
             try {
-                if (isReady || isInitializingRef.current) {
+                if (isReady || isInitializingRef.current || error) {
                     return;
                 }
 
