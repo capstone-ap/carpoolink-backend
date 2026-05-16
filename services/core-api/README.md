@@ -52,6 +52,33 @@ npm run dev -w services/core-api
 - `GET /mentorings/group`: 일대다 멘토링 목록을 조회합니다. `status`(`READY`/`ON_AIR`/`COMPLETED`) 쿼리로 상태를 필터링할 수 있습니다.
 - `GET /mentorings/one-on-one`: 일대일 멘토링 상대 목록을 조회합니다. `x-user-id`가 필요합니다.
 
+### Paid Questions (유료 질문)
+
+유료 질문은 **일대다 멘토링(group mentoring)에만** 제공되는 기능입니다. 멘토가 화면을 못 보는 상황을 가정하여 질문을 TTS로 읽고, 멘토의 실시간 음성에서 STT로 생성된 스크립트를 답변으로 간주합니다.
+
+- `GET /mentorings/{id}/questions`: 멘토링의 질문 목록을 조회합니다. `x-user-id`가 필요합니다.
+  - 멘토: 모든 질문 조회 가능
+  - 멘티: 자신의 질문만 조회 가능
+
+- `POST /mentorings/{id}/questions`: (유료) 질문을 등록합니다. `x-user-id`가 필요합니다.
+  - 요청 본문:
+    ```json
+    {
+        "content": "질문 내용",
+        "isPaid": true
+    }
+    ```
+  - 유료 질문(`isPaid: true`)의 경우 멘티의 질문 잔액(`balance`)에서 1회 차감됩니다.
+  - 잔액 부족 시 오류를 반환합니다.
+
+- `POST /mentorings/{id}/questions/{questionId}/acknowledge`: 멘토가 질문을 확인하고 답변 시작 상태(`ANSWERING`)로 전환합니다. `x-user-id`가 필요합니다.
+  - 멘토만 호출 가능
+  - 이 시점부터 생성되는 스크립트가 질문에 대한 답변으로 저장됩니다.
+
+- `POST /mentorings/{id}/questions/{questionId}/complete`: 멘토가 답변 완료 상태(`COMPLETED`)로 전환합니다. `x-user-id`가 필요합니다.
+  - 멘토만 호출 가능
+  - 이 시점부터 STT 수집이 종료되며, 수집된 스크립트가 답변으로 저장됩니다.
+
 ### Scripts
 
 - `GET /scripts`: 접근 가능한 스크립트 멘토링 목록을 조회합니다. `x-user-id`와 `type`(`all`/`group`/`one-on-one`) 쿼리를 사용합니다.
