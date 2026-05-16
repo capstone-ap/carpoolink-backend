@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -130,6 +130,10 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
         mentoringType: "GROUP",
         isJoined: isConnected
     });
+
+    const handleAutoPlayBlocked = useCallback(() => {
+        setIsAutoplayBlocked(true);
+    }, []);
 
     useEffect(() => {
         const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4001";
@@ -321,7 +325,7 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
                                 <MediaRenderer
                                     key={id}
                                     stream={stream}
-                                    onBlocked={() => setIsAutoplayBlocked(true)}
+                                    onBlocked={() => handleAutoPlayBlocked}
                                 />
                             ))}
 
@@ -477,22 +481,42 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
 // ============================================================================
 function MediaRenderer({ stream, onBlocked }: { stream: MediaStream, onBlocked: () => void }) {
     const mediaRef = useRef<HTMLMediaElement>(null);
-    // 이 스트림이 비디오 트랙을 가졌는지 확인
+
+    // 이 스트림이 비디오/오디오 트랙을 가졌는지 각각 확인
     const isVideo = stream.getVideoTracks().length > 0;
+    const hasAudio = stream.getAudioTracks().length > 0;
 
     useEffect(() => {
         if (mediaRef.current && stream) {
             mediaRef.current.srcObject = stream;
             mediaRef.current.play().catch((err) => {
+                console.warn("미디어 자동재생 차단됨:", err.message);
                 if (err.name === "NotAllowedError" || err.message.includes("play() failed")) {
                     onBlocked();
                 }
             });
         }
+
+        // 💡 [추가] 컴포넌트 언마운트 시 미디어 할당 해제 (메모리 누수 및 카메라 자원 낭비 방지)
+        return () => {
+            if (mediaRef.current) {
+                mediaRef.current.srcObject = null;
+            }
+        };
     }, [stream, onBlocked]);
 
     if (isVideo) {
-        return <video ref={mediaRef as any} className="absolute inset-0 w-full h-full object-cover" autoPlay playsInline />;
+        // 💡 [핵심 수정] 오디오 트랙이 없는 순수 비디오 스트림이면 muted를 강제로 부여!
+        // 이렇게 해야 iOS(아이폰) 및 모바일 크롬에서 사용자 터치 없이도 화면이 부드럽게 자동 재생됩니다.
+        return (
+            <video
+                ref={mediaRef as any}
+                className="absolute inset-0 w-full h-full object-cover"
+                autoPlay
+                playsInline
+                muted={!hasAudio}
+            />
+        );
     } else {
         // 오디오는 화면을 차지하지 않도록 숨김 처리
         return <audio ref={mediaRef as any} autoPlay playsInline className="hidden" />;
