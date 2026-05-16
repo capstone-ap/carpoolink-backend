@@ -31,6 +31,7 @@ export default function PrivateMentoringPage() {
   // 💡 실시간 채팅 상태
   const [chatSocket, setChatSocket] = useState<Socket | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]); // 더미 데이터 제거
+  const [isChatClosed, setIsChatClosed] = useState(false);
 
   useEffect(() => {
     const storedRole = localStorage.getItem("userRole")?.toUpperCase();
@@ -54,7 +55,8 @@ export default function PrivateMentoringPage() {
       mentoringId: sessionData?.mentoringId?.toString() || "",
       peerId: peerId || "",
       role,
-      mentoringType: "ONE_ON_ONE",
+      mentoringType: "ONE_ON_ONE", // 💡 1:1 멘토링 타입 명시
+      isJoined: isConnected, // 💡 멘토링 세션에 실제로 연결된 상태를 WebRTC 훅에 전달
     });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -78,10 +80,10 @@ export default function PrivateMentoringPage() {
     if (!mentoringIdStr || !userId) return;
 
     // 배포 환경이면 Nginx 라우팅, 로컬이면 4001번 포트로 연결
-    const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_CHAT_API_URL || "http://localhost:4001";
+    const SERVER_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4001";
     const socketPath = "/chat/socket.io";
 
-    const newChatSocket = io(CHAT_SERVER_URL, {
+    const newChatSocket = io(SERVER_URL, {
       path: socketPath,
       withCredentials: true,
       transports: ["websocket", "polling"],
@@ -111,7 +113,7 @@ export default function PrivateMentoringPage() {
       console.log("👋 상대방 입장 이벤트 수신:", data);
 
       const incomingNickname = data.nickname || data.userName;
-      
+
       // 내 닉네임과 다른 사람(상대방)이 들어왔을 때만 업데이트
       if (incomingNickname && incomingNickname !== userName) {
         setOpponentNickname(incomingNickname);
@@ -122,7 +124,7 @@ export default function PrivateMentoringPage() {
     newChatSocket.on("message_history", (historyData: any[]) => {
       const mapped = historyData.map(m => {
         const isMe = String(m.userId) === String(userId);
-        
+
         // 내 메시지가 아닌데 이름 정보가 있다면 업데이트!
         if (!isMe && (m.user?.nickname || m.userName)) {
           setOpponentNickname(m.user?.nickname || m.userName);
@@ -134,7 +136,7 @@ export default function PrivateMentoringPage() {
           text: m.content,
         };
       }) as ChatMessage[];
-      
+
       setMessages(mapped);
     });
 
@@ -154,6 +156,12 @@ export default function PrivateMentoringPage() {
       }]);
     });
 
+    newChatSocket.on("room_closed", (data: any) => {
+      setIsChatClosed(true);
+      alert("멘토링이 종료되었습니다.");
+      window.location.href = "/mentoring_list/1on1_list";
+    });
+
     setChatSocket(newChatSocket);
 
     return () => {
@@ -161,33 +169,32 @@ export default function PrivateMentoringPage() {
     };
   }, [sessionData?.mentoringId, userId, userName, role]); // role 의존성 추가 권장
 
-  // 원격 오디오 스트림 수신 및 연결
+  // 1. 💡 최적화된 원격 오디오 스트림 수신 및 연결
   useEffect(() => {
-    if (remoteAudioRef.current && remoteStreams.size > 0) {
-      const combinedStream = new MediaStream();
+    if (!remoteAudioRef.current || remoteStreams.size === 0) return;
 
-      remoteStreams.forEach((stream) => {
-        stream.getAudioTracks().forEach((track) => {
-          if (!combinedStream.getTracks().find(t => t.id === track.id)) {
-            combinedStream.addTrack(track);
-          }
-        });
+    // 1:1 멘토링이므로 복잡한 병합(Merge) 없이 첫 번째 원격 스트림을 그대로 사용합니다.
+    const streamArray = Array.from(remoteStreams.values());
+    const stream = streamArray[streamArray.length - 1];
+
+    // 🚨 [핵심] 이미 오디오 태그에 같은 스트림이 연결되어 있다면 덮어쓰지 않습니다.
+    // (채팅을 입력할 때마다 srcObject가 재할당되어 미세하게 음성이 끊기는 현상을 원천 차단)
+    if (remoteAudioRef.current.srcObject !== stream) {
+      remoteAudioRef.current.srcObject = stream;
+      remoteAudioRef.current.play().catch((err) => {
+        console.warn("오디오 재생 실패 (오토플레이 정책 등):", err);
       });
-
-      if (combinedStream.getAudioTracks().length > 0) {
-        remoteAudioRef.current.srcObject = combinedStream;
-        remoteAudioRef.current.play().catch((err) => {
-          console.error("오디오 재생 실패 (오토플레이 정책 등):", err);
-        });
-      }
     }
   }, [remoteStreams]);
 
+  // 2. 💡 [추가] 페이지 이탈 시 오디오 자원 완벽 해제 (메모리 누수 및 백그라운드 재생 방지)
   useEffect(() => {
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.muted = !isSpeakerOn;
-    }
-  }, [isSpeakerOn]);
+    return () => {
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = null;
+      }
+    };
+  }, []);
 
   // ✅ [새로운 타이머 로직] 서버 시간에 맞춰 동기화
   useEffect(() => {
@@ -200,7 +207,7 @@ export default function PrivateMentoringPage() {
     const timerInterval = setInterval(() => {
       const nowMs = Date.now(); // 내 컴퓨터의 현재 시간
       const diffInSeconds = Math.floor((nowMs - startTimeMs) / 1000);
-      
+
       // 멘티가 약간 일찍 들어왔을 때 타이머가 음수로 가는 것 방지
       setElapsedTime(diffInSeconds > 0 ? diffInSeconds : 0);
     }, 1000);
@@ -236,7 +243,7 @@ export default function PrivateMentoringPage() {
   // 💡 [수정된 채팅 전송 함수]
   const handleSendMessage = () => {
     // 1. 방어 로직 (내용이 없거나, 소켓이 없거나, 방 번호가 없으면 중단)
-    if (!chatInput.trim() || !chatSocket || !sessionData?.mentoringId) {
+    if (!chatInput.trim() || !chatSocket || !sessionData?.mentoringId || isChatClosed) {
       console.warn("⚠️ 전송 불가 상태:", { input: chatInput, socket: !!chatSocket, roomId: sessionData?.mentoringId });
       return;
     }
@@ -270,7 +277,7 @@ export default function PrivateMentoringPage() {
       <audio ref={remoteAudioRef} autoPlay />
 
       <header className="w-full px-5 py-3 flex items-center justify-between shrink-0 bg-white z-30 shadow-sm relative h-[60px]">
-        
+
         {/* 1. 왼쪽 영역 (뒤로가기 버튼) - flex-1을 주어 공간 확보 */}
         <div className="flex-1 flex justify-start z-10">
           <button
@@ -289,7 +296,7 @@ export default function PrivateMentoringPage() {
             <h1 className="text-[17px] font-extrabold tracking-tight text-[#1A1A1A]">
               {opponentNickname}
             </h1>
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+            <div className={`w-2 h-2 rounded-full ${(isConnected && !isChatClosed) ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
           </div>
           <span className="text-[12px] font-medium text-gray-500 mt-0.5 font-mono tracking-tight">
             {formatTime(elapsedTime)}
@@ -303,8 +310,13 @@ export default function PrivateMentoringPage() {
               종료
             </button>
           ) : (
-            /* 멘티일 경우 버튼은 안 보이지만, 레이아웃 공간은 차지하도록 빈 div 유지 (선택사항) */
-            <div className="w-8"></div>
+            // 멘티일 경우 빈 공간 대신 '나가기' 버튼 렌더링 및 페이지 이동 연결
+            <button
+              onClick={() => window.location.href = "/mentoring_list/1on1_list"}
+              className="text-gray-500 hover:text-gray-700 font-bold text-[15px] p-1 transition-colors"
+            >
+              나가기
+            </button>
           )}
         </div>
 
@@ -392,9 +404,9 @@ export default function PrivateMentoringPage() {
             </div>
 
             {messages.length === 0 ? (
-               <div className="h-full flex items-center justify-center text-gray-500 text-sm">
-                  메시지를 입력해 첫 인사를 나눠보세요.
-               </div>
+              <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+                메시지를 입력해 첫 인사를 나눠보세요.
+              </div>
             ) : (
               messages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2`}>

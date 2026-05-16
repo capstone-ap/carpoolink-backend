@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -127,8 +127,13 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
         mentoringId,
         peerId: peerId || "",
         role,
-        mentoringType: "GROUP"
+        mentoringType: "GROUP",
+        isJoined: isConnected
     });
+
+    const handleAutoPlayBlocked = useCallback(() => {
+        setIsAutoplayBlocked(true);
+    }, []);
 
     useEffect(() => {
         const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4001";
@@ -189,7 +194,8 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
 
         socket.on("room_closed", (data: any) => {
             setIsChatClosed(true);
-            alert("멘토링이 종료되어 채팅이 마감되었습니다.");
+            alert("멘토링이 종료되었습니다.");
+            window.location.href = "/mentoring_list/live_list";
         });
 
         socket.on("error", (err: any) => {
@@ -320,7 +326,7 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
                                 <MediaRenderer
                                     key={id}
                                     stream={stream}
-                                    onBlocked={() => setIsAutoplayBlocked(true)}
+                                    onBlocked={() => handleAutoPlayBlocked}
                                 />
                             ))}
 
@@ -471,29 +477,54 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
     );
 }
 
-// ============================================================================
-// [미디어 렌더러 컴포넌트] 비디오와 오디오를 구분하여 안전하게 재생
-// ============================================================================
-function MediaRenderer({ stream, onBlocked }: { stream: MediaStream, onBlocked: () => void }) {
-    const mediaRef = useRef<HTMLMediaElement>(null);
-    // 이 스트림이 비디오 트랙을 가졌는지 확인
-    const isVideo = stream.getVideoTracks().length > 0;
+import React, { memo } from "react";
 
+// ============================================================================
+// [미디어 렌더러 컴포넌트] 비디오와 오디오를 구분하여 안전하게 재생 (깜빡임 방지 버전)
+// ============================================================================
+const MediaRenderer = memo(function MediaRenderer({ stream, onBlocked }: { stream: MediaStream, onBlocked: () => void }) {
+    const mediaRef = useRef<HTMLMediaElement>(null);
+
+    const isVideo = stream.getVideoTracks().length > 0;
+    const hasAudio = stream.getAudioTracks().length > 0;
+
+    // 1. 💡 스트림 설정 및 재생 관리 Effect
     useEffect(() => {
         if (mediaRef.current && stream) {
-            mediaRef.current.srcObject = stream;
-            mediaRef.current.play().catch((err) => {
-                if (err.name === "NotAllowedError" || err.message.includes("play() failed")) {
-                    onBlocked();
-                }
-            });
+            // 🚨 [핵심] 이미 엘리먼트에 같은 스트림이 주입되어 있다면 아무것도 하지 않습니다.
+            // srcObject를 매번 새로 대입하면 비디오 파이프라인이 초기화되면서 깜빡임이 발생합니다.
+            if (mediaRef.current.srcObject !== stream) {
+                mediaRef.current.srcObject = stream;
+                mediaRef.current.play().catch((err) => {
+                    console.warn("미디어 자동재생 차단됨:", err.message);
+                    if (err.name === "NotAllowedError" || err.message.includes("play() failed")) {
+                        onBlocked();
+                    }
+                });
+            }
         }
-    }, [stream, onBlocked]);
+    }, [stream, onBlocked]); // 이펙트 재실행 시 srcObject를 null로 밀어버리는 코드를 제거함
+
+    // 2. 💡 진짜 컴포넌트가 '언마운트' 될 때만 미디어 자원을 깔끔하게 해제하는 별도 Effect
+    useEffect(() => {
+        return () => {
+            if (mediaRef.current) {
+                mediaRef.current.srcObject = null;
+            }
+        };
+    }, []); // 의존성 배열을 비워둠으로써 화면에서 아예 사라질 때 딱 1번만 실행됩니다.
 
     if (isVideo) {
-        return <video ref={mediaRef as any} className="absolute inset-0 w-full h-full object-cover" autoPlay playsInline />;
+        return (
+            <video
+                ref={mediaRef as any}
+                className="absolute inset-0 w-full h-full object-cover"
+                autoPlay
+                playsInline
+                muted={!hasAudio}
+            />
+        );
     } else {
-        // 오디오는 화면을 차지하지 않도록 숨김 처리
         return <audio ref={mediaRef as any} autoPlay playsInline className="hidden" />;
     }
-}
+});

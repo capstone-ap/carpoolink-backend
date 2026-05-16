@@ -47,8 +47,6 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
             const res = await apiClient.get(`/media/mentorings/${mentoringId}`);
             const data = res.data;
 
-            console.log("🔍 미디어 서버 응답 데이터:", data); // 데이터 구조 확인용
-
             if (isMountedRef.current) {
                 // 1. 서버 응답 구조 대응 (mentoring 객체 안에 있거나, 평평한 구조이거나)
                 const mentoringInfo = data.mentoring || data;
@@ -59,9 +57,9 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
                     title: mentoringInfo?.title || "멘토링 세션",
                     status: mentoringInfo?.status || "ON_AIR",
                     participantCount: data?.media?.peers?.length || 0,
-                    host: { 
-                        userId: mentoringInfo?.userId || 0, 
-                        nickname: mentoringInfo?.nickname || "호스트" 
+                    host: {
+                        userId: mentoringInfo?.userId || 0,
+                        nickname: mentoringInfo?.nickname || "호스트"
                     },
                     startedAt: mentoringInfo?.startedAt || null,
                 });
@@ -106,7 +104,10 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
             );
 
             socket.on("connect", () => {
-                if (!isMountedRef.current) return;
+                if (!isMountedRef.current) {
+                    console.warn("⚠️ 소켓이 연결되었으나 컴포넌트가 언마운트 상태입니다.");
+                    return;
+                }
                 console.log("Media server connected:", socket.id);
 
                 // joinMentoring 액션 발송
@@ -122,17 +123,27 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
                         },
                     },
                     (response: any) => {
-                        if (!isMountedRef.current) return;
+                        if (!isMountedRef.current) {
+                            console.warn("⚠️ 서버 응답을 받았으나 컴포넌트가 이미 언마운트되었습니다.");
+                            return;
+                        }
 
                         if (response?.ok) {
-                            console.log("Joined mentoring:", response.data);
+                            console.log("🎉 Joined mentoring");
                             setPeerId(response.data?.peerId || socket.id);
                             setIsConnected(true);
                         } else {
+                            // 💡 [추가] 실패 시 브라우저 콘솔에 빨간색으로 에러를 명시적으로 출력
+                            console.error("❌ joinMentoring 서버 처리 실패 원인:", response?.error || response);
                             setError(response?.error || "멘토링 참여 실패");
                         }
                     }
                 );
+            });
+
+            // 💡 [추가] 소켓 자체의 연결 에러 세부 진단
+            socket.on("connect_error", (err) => {
+                console.error("🚨 소켓 연결 자체에 에러 발생 (connect_error):", err.message, err);
             });
 
             socket.on("signal", (message: any) => {

@@ -60,7 +60,11 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
             methods: ['GET', 'POST'],
             credentials: true
         },
-        transports: ['websocket', 'polling']
+        transports: ['websocket', 'polling'],
+        connectionStateRecovery: {
+            maxDisconnectionDuration: 2 * 60 * 1000, // 2분
+            skipMiddlewares: true
+        }
     });
 
     const socketContext = new Map();
@@ -85,67 +89,77 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
     }
 
     io.on('connection', (socket) => {
-        socket.on('signal', async (message = {}) => {
+        socket.on('signal', async (message = {}, callback) => {
             const { requestId, action, data = {} } = message;
-
+            console.log(`Received signaling message: ${action}`);
             try {
+                let result;
                 switch (action) {
                     case 'joinMentoring': {
-                        const mentoringId = Number(data.mentoringId);
-                        const role = data.role ?? 'mentee';
-                        const peerId = data.userId ?? socket.id;
+                        try {
+                            const mentoringId = Number(data.mentoringId);
+                            const role = data.role ?? 'MENTEE';
+                            const peerId = data.userId ?? socket.id;
 
-                        if (!Number.isFinite(mentoringId)) {
-                            throw new Error('유효하지 않은 멘토링 ID입니다.');
-                        }
-
-                        const mentoring = await mentoringRepository.getMentoringById(mentoringId);
-
-                        if (!mentoring || mentoring.status !== 'ON_AIR') {
-                            throw new Error('멘토링 세션이 진행 중이 아닙니다.');
-                        }
-
-                        const userId = resolveUserIdFromSocket(socket, data);
-
-                        if (role === 'mentor') {
-                            if (userId === null) {
-                                throw new Error('멘토 권한이 필요합니다.');
+                            if (!Number.isFinite(mentoringId)) {
+                                throw new Error('유효하지 않은 멘토링 ID입니다.');
                             }
 
-                            await mentoringRepository.assertMentorUser(userId);
+                            const mentoring = await mentoringRepository.getMentoringById(mentoringId);
 
-                            if (Number(mentoring.userId) !== Number(userId)) {
-                                throw new Error('멘토링 세션에 참여할 권한이 없습니다.');
+                            if (!mentoring || mentoring.status !== 'ON_AIR') {
+                                throw new Error('멘토링 세션이 진행 중이 아닙니다.');
                             }
-                        }
 
-                        const joinResult = await mediaOrchestrator.addPeer({
-                            mentoringId,
-                            peerId,
-                            role,
-                            socket,
-                            isGroup: mentoring.isGroup,
-                            userId,
-                        });
+                            const userId = resolveUserIdFromSocket(socket, data);
 
-                        socketContext.set(socket.id, { mentoringId, peerId, role, userId });
+                            if (role === 'MENTOR') {
+                                if (userId === null) {
+                                    throw new Error('멘토 권한이 필요합니다.');
+                                }
 
-                        sendReply(socket, requestId, {
-                            peerId,
-                            ...joinResult,
-                            audioPipeline: audioPipeline.getRoomSnapshot(mentoringId)
-                        });
+                                await mentoringRepository.assertMentorUser(userId);
 
-                        notifyPeers(
-                            mentoringId,
-                            'peer-joined',
-                            {
+                                if (Number(mentoring.userId) !== Number(userId)) {
+                                    throw new Error('멘토링 세션에 참여할 권한이 없습니다.');
+                                }
+                            }
+
+                            const joinResult = await mediaOrchestrator.addPeer({
+                                mentoringId,
                                 peerId,
-                                role
-                            },
-                            peerId
-                        );
-                        break;
+                                role,
+                                socket,
+                                isGroup: mentoring.isGroup,
+                                userId,
+                            });
+
+                            result = {
+                                peerId,
+                                ...joinResult,
+                                audioPipeline: audioPipeline.getRoomSnapshot(mentoringId)
+                            };
+
+                            socketContext.set(socket.id, { mentoringId, peerId, role, userId });
+
+                            notifyPeers(
+                                mentoringId,
+                                'peer-joined',
+                                {
+                                    peerId,
+                                    role
+                                },
+                                peerId
+                            );
+                            break;
+                        } catch (error) {
+                            console.error('joinMentoring error:', error);
+                            if (typeof callback === 'function') {
+                                callback({ ok: false, error: error.message });
+                                return;
+                            }
+                            break;
+                        }
                     }
                     case 'getRtpCapabilities': {
                         const context = socketContext.get(socket.id);
@@ -159,7 +173,7 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             throw new Error('멘토링 세션이 존재하지 않습니다.');
                         }
 
-                        sendReply(socket, requestId, room.router.rtpCapabilities);
+                        result = JSON.parse(JSON.stringify(room.router.rtpCapabilities));
                         break;
                     }
                     case 'createWebRtcTransport': {
@@ -175,7 +189,7 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             direction: data.direction ?? 'recv'
                         });
 
-                        sendReply(socket, requestId, transport);
+                        result = transport;
                         break;
                     }
                     case 'connectWebRtcTransport': {
@@ -192,7 +206,7 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             dtlsParameters: data.dtlsParameters
                         });
 
-                        sendReply(socket, requestId, { connected: true });
+                        result = { connected: true };
                         break;
                     }
                     case 'produce': {
@@ -211,8 +225,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             appData: data.appData
                         });
 
-                        sendReply(socket, requestId, produced);
-
                         notifyPeers(
                             context.mentoringId,
                             'new-producer',
@@ -224,6 +236,7 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             },
                             context.peerId
                         );
+                        result = produced;
                         break;
                     }
                     case 'consume': {
@@ -252,7 +265,7 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             rtpCapabilities: data.rtpCapabilities
                         });
 
-                        sendReply(socket, requestId, consumed);
+                        result = consumed;
                         break;
                     }
                     case 'resumeConsumer': {
@@ -268,7 +281,7 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             consumerId: data.consumerId
                         });
 
-                        sendReply(socket, requestId, { resumed: true });
+                        result = { resumed: true };
                         break;
                     }
                     case 'listProducers': {
@@ -283,7 +296,7 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             context.peerId
                         );
 
-                        sendReply(socket, requestId, producerIds);
+                        result = producerIds;
                         break;
                     }
                     case 'ttsEnqueue': {
@@ -299,10 +312,10 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                             metadata: data.metadata ?? null
                         });
 
-                        sendReply(socket, requestId, {
+                        result = {
                             queued: true,
                             message: 'TTS request queued; attach a tts-bot audio producer to inject actual synthesized audio'
-                        });
+                        };
                         break;
                     }
                     case 'leaveMentoring': {
@@ -326,14 +339,27 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                         );
 
                         socketContext.delete(socket.id);
-                        sendReply(socket, requestId, { left: true });
+                        result = { left: true };
                         break;
                     }
                     default:
                         throw new Error(`알 수 없는 signaling 액션: ${action}`);
                 }
+
+                if (typeof callback === 'function') {
+                    callback({ ok: true, data: result });
+                } else {
+                    sendReply(socket, requestId, result);
+                }
             } catch (error) {
-                sendError(socket, requestId, error);
+                console.error('Signaling error:', error);
+                const errorMessage = error instanceof Error ? error.message : String(error);
+
+                if (typeof callback === 'function') {
+                    callback({ ok: false, error: errorMessage });
+                } else {
+                    sendError(socket, requestId, { message: errorMessage });
+                }
             }
         });
 

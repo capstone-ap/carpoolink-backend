@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, useCallback, use } from "react";
 import { Device, types as MediaSoupTypes } from "mediasoup-client";
 import { Socket } from "socket.io-client";
-import { resolve } from "path";
-import { request } from "http";
 
 interface WebRtcSessionConfig {
     socket: Socket | null;
@@ -10,6 +8,7 @@ interface WebRtcSessionConfig {
     peerId: string;
     role: string;
     mentoringType?: "GROUP" | "ONE_ON_ONE";
+    isJoined: boolean;
     onRemoteStream?: (stream: MediaStream) => void;
     onError?: (error: string) => void;
 }
@@ -103,7 +102,15 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     requestId: `get-rtp-caps-${Date.now()}`,
                     action: "getRtpCapabilities",
                     data: {},
-                }, (res: any) => res?.of ? resolve(res) : reject(new Error(res?.error)));
+                }, (res: any) => {
+                    console.log("📩 RTP Capabilities 서버 응답:", res);
+                    if (res?.ok) {
+                        resolve(res);
+                    } else {
+                        const errorMsg = res?.error || "Unknown server error";
+                        reject(new Error(errorMsg));
+                    }
+                });
             });
 
             console.log("🚀 Loading MediaSoup device...");
@@ -114,17 +121,26 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
             deviceRef.current = device;
             return device;
         } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : "Device 초기화 실패";
-            console.error("❌ Device init error:", errorMsg);
+            const error = err as any;
+
+            console.error(`[❌ Device init error 발생!`);
+
+            // 직렬화하지 않고 객체 날것 그대로 콘솔에 출력 (화살표를 눌러 내부를 볼 수 있음)
+            console.error("1. Raw Error Object:", error);
+
+            // 프로토타입 체인을 무시하고 명시적으로 속성 추출
+            console.error("2. Error Details -> Name:", error?.name, " | Message:", error?.message);
+            console.error("3. Error Stack:", error?.stack);
+
             if (isMountedRef.current) {
-                setError(errorMsg);
+                setError(error?.message || "Device 초기화 실패");
             }
             throw err;
         }
-    }, [config.socket]);
+    }, [config.socket?.id, config.peerId, localStream]);
 
     // 3. Send Transport 생성
-    const createSendTransport = (device: Device): Promise<MediaSoupTypes.Transport> => {
+    const createSendTransport = useCallback((device: Device): Promise<MediaSoupTypes.Transport> => {
         return new Promise((resolve, reject) => {
             if (!config.socket) return reject(new Error("소켓이 없습니다"));
 
@@ -181,10 +197,10 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                 }
             );
         });
-    }
+    }, [config.socket]);
 
     // 4. Recv Transport 생성
-    const createRecvTransport = (device: Device): Promise<MediaSoupTypes.Transport> => {
+    const createRecvTransport = useCallback((device: Device): Promise<MediaSoupTypes.Transport> => {
         return new Promise((resolve, reject) => {
             if (!config.socket) return reject(new Error("소켓이 없습니다"));
 
@@ -238,7 +254,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                 }
             )
         })
-    }
+    }, [config.socket]);
 
     // 5. Producer 생성 (로컬 미디어 송출)
     const produceAudio = useCallback(
@@ -395,6 +411,26 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
 
                     // 💡 [수정] 위에서 만든 통합 헬퍼 함수를 호출합니다.
                     await requestConsume(producerId, kind);
+                } else if (message.event === "producer-closed") {
+                    // 상대방이 나가거나 연결이 끊겨 프로듀서가 닫힌 경우 자원 정리
+
+                    console.log("🚪 Producer closed:", message.data);
+                    const { producerId } = message.data;
+
+                    setRemoteStreams((prev) => {
+                        const newMap = new Map(prev);
+                        newMap.delete(producerId);
+                        return newMap;
+                    });
+
+                    for (const [consumerId, consumer] of consumersRef.current.entries()) {
+                        if (consumer.producerId === producerId) {
+                            consumer.close();
+                            consumersRef.current.delete(consumerId);
+                            console.log(`✅ Closed consumer for producer: ${producerId}`);
+                            break;
+                        }
+                    }
                 }
             } catch (err) {
                 console.error("Signal 처리 오류:", err);
@@ -421,24 +457,37 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
     useEffect(() => {
         isMountedRef.current = true;
 
+        // 🚨 [핵심] 연결이 끊겼거나 아직 방(joinMentoring)에 입장하기 전이라면 
+        // WebRTC 실행을 중단하고 기존 장치 상태들을 전부 초기화하여 재연결 충돌을 방지합니다.
+        if (!config.isJoined) {
+            if (isReady) {
+                setIsReady(false);
+                setRemoteStreams(new Map());
+            }
+            isInitializingRef.current = false;
+            deviceRef.current = null;
+            sendTransportRef.current = null;
+            recvTransportRef.current = null;
+            producersRef.current.clear();
+            consumersRef.current.clear();
+            setRemoteStreams(new Map());
+            return;
+        }
+
         const init = async () => {
             try {
-                if (isReady || isInitializingRef.current) {
+                if (isReady || isInitializingRef.current || error) {
                     return;
                 }
 
-                // 1. 기본 연결 상태 확인
-                // 소켓과 peerId가 있을 때만 미디어 서버 연결(mediasoup) 로직 진행
-                if (!config.socket?.connected || !config.peerId) {
+                // 1. 기본 연결 및 방 참여 상태 확인
+                if (!config.socket?.connected || !config.peerId || !config.isJoined) {
                     return;
                 }
 
-                // 멘토링 타입에 따라 스트림 필수 여부 확인
-                // 1:N 멘티는 localStream이 null이어도 초기화를 계속 진행해야 합니다 (수신을 위해)
                 const isOneToOne = config.mentoringType === "ONE_ON_ONE";
                 const needsLocalStream = config.role === "MENTOR" || isOneToOne;
 
-                // 스트림이 꼭 필요한 역할인데 아직 준비가 안 됐다면 대기
                 if (needsLocalStream && !localStream) {
                     console.log("Waiting for local stream...");
                     return;
@@ -446,47 +495,36 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
 
                 isInitializingRef.current = true;
 
-                // 2. Mediasoup 장치 및 트랜스포트 생성 (송/수신 공통)
+                // 2. Mediasoup 장치 및 트랜스포트 생성
                 const device = await initDevice();
                 const sendTransport = await createSendTransport(device);
-
                 await createRecvTransport(device);
 
                 // 3. 송출(Produce) 로직
-                // localStream이 존재할 때만 실행되도록 if문으로 감싸 타입을 확정합니다.
                 if (localStream) {
                     if (config.role === "MENTOR") {
-                        // 멘토는 비디오와 오디오 모두 송출
                         await produceAudio(localStream, sendTransport);
                         await produceVideo(localStream, sendTransport);
                         console.log("✅ Mentor tracks produced");
                     } else if (isOneToOne) {
-                        // 1:1 멘티인 경우 오디오만 송출
                         await produceAudio(localStream, sendTransport);
                         console.log("✅ Mentee audio track produced (1:1)");
                     }
-                } else {
-                    // 1:N 멘티의 경우 localStream이 없으므로 송출 로직을 건너뜁니다.
-                    console.log("ℹ️ 1:N Mentee mode: Skipping production");
                 }
 
+                // 4. 기존 Producer 확인 및 수신
                 const { data: producerIds } = await new Promise<{ data: any[] }>((resolve, reject) => {
-                    config.socket?.emit(
-                        "signal",
-                        {
-                            requestId: `list-producers-${Date.now()}`,
-                            action: "listProducers",
-                            data: {}
-                        },
-                        (response: any) => {
-                            if (response?.ok) resolve(response);
-                            else reject(new Error(response?.error));
-                        }
-                    );
+                    config.socket?.emit("signal", {
+                        requestId: `list-producers-${Date.now()}`,
+                        action: "listProducers",
+                        data: {}
+                    }, (response: any) => {
+                        if (response?.ok) resolve(response);
+                        else reject(new Error(response?.error));
+                    });
                 });
 
                 if (producerIds && producerIds.length > 0) {
-                    console.log("📥 Found existing producers:", producerIds);
                     for (const p of producerIds) {
                         const pid = typeof p === 'string' ? p : p.producerId;
                         const pkind = typeof p === 'string' ? undefined : p.kind;
@@ -507,25 +545,17 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
             }
         };
 
-        const retryInit = () => {
-            void init();
-        };
-
-        if (config.socket) {
-            config.socket.on("connect", retryInit);
-            config.socket.on("reconnect", retryInit);
-        }
+        // ❌ 기존에 소켓 재연결 시 강제로 init()을 호출하던 
+        // socket.on("connect", retryInit) 부분은 완전히 삭제합니다. 
+        // 이제 isJoined 상태 변경에 의해 React가 자연스럽게 순서를 보장하며 재실행합니다.
 
         init();
 
         return () => {
             isMountedRef.current = false;
-            if (config.socket) {
-                config.socket.off("connect", retryInit);
-                config.socket.off("reconnect", retryInit);
-            }
         };
-    }, [config.socket, config.peerId, config.role, isReady, initLocalStream, initDevice, createSendTransport, createRecvTransport, produceAudio, produceVideo, localStream]);
+        // 💡 의존성 배열에 config.isJoined 필수 추가
+    }, [config.socket, config.peerId, config.isJoined, config.role, isReady, initLocalStream, initDevice, createSendTransport, createRecvTransport, produceAudio, produceVideo, localStream]);
 
     // 카메라/마이크 토글
     const setCameraOn = useCallback(
