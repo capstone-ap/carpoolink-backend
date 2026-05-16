@@ -140,7 +140,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
     }, [config.socket?.id, config.peerId, localStream]);
 
     // 3. Send Transport 생성
-    const createSendTransport = (device: Device): Promise<MediaSoupTypes.Transport> => {
+    const createSendTransport = useCallback((device: Device): Promise<MediaSoupTypes.Transport> => {
         return new Promise((resolve, reject) => {
             if (!config.socket) return reject(new Error("소켓이 없습니다"));
 
@@ -197,10 +197,10 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                 }
             );
         });
-    }
+    }, [config.socket]);
 
     // 4. Recv Transport 생성
-    const createRecvTransport = (device: Device): Promise<MediaSoupTypes.Transport> => {
+    const createRecvTransport = useCallback((device: Device): Promise<MediaSoupTypes.Transport> => {
         return new Promise((resolve, reject) => {
             if (!config.socket) return reject(new Error("소켓이 없습니다"));
 
@@ -254,7 +254,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                 }
             )
         })
-    }
+    }, [config.socket]);
 
     // 5. Producer 생성 (로컬 미디어 송출)
     const produceAudio = useCallback(
@@ -440,7 +440,10 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
         // 🚨 [핵심] 연결이 끊겼거나 아직 방(joinMentoring)에 입장하기 전이라면 
         // WebRTC 실행을 중단하고 기존 장치 상태들을 전부 초기화하여 재연결 충돌을 방지합니다.
         if (!config.isJoined) {
-            setIsReady(false);
+            if (isReady) {
+                setIsReady(false);
+                setRemoteStreams(new Map());
+            }
             isInitializingRef.current = false;
             deviceRef.current = null;
             sendTransportRef.current = null;
