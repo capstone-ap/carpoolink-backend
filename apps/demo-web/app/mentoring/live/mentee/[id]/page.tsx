@@ -477,38 +477,44 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
     );
 }
 
+import React, { memo } from "react";
+
 // ============================================================================
-// [미디어 렌더러 컴포넌트] 비디오와 오디오를 구분하여 안전하게 재생
+// [미디어 렌더러 컴포넌트] 비디오와 오디오를 구분하여 안전하게 재생 (깜빡임 방지 버전)
 // ============================================================================
-function MediaRenderer({ stream, onBlocked }: { stream: MediaStream, onBlocked: () => void }) {
+const MediaRenderer = memo(function MediaRenderer({ stream, onBlocked }: { stream: MediaStream, onBlocked: () => void }) {
     const mediaRef = useRef<HTMLMediaElement>(null);
 
-    // 이 스트림이 비디오/오디오 트랙을 가졌는지 각각 확인
     const isVideo = stream.getVideoTracks().length > 0;
     const hasAudio = stream.getAudioTracks().length > 0;
 
+    // 1. 💡 스트림 설정 및 재생 관리 Effect
     useEffect(() => {
         if (mediaRef.current && stream) {
-            mediaRef.current.srcObject = stream;
-            mediaRef.current.play().catch((err) => {
-                console.warn("미디어 자동재생 차단됨:", err.message);
-                if (err.name === "NotAllowedError" || err.message.includes("play() failed")) {
-                    onBlocked();
-                }
-            });
+            // 🚨 [핵심] 이미 엘리먼트에 같은 스트림이 주입되어 있다면 아무것도 하지 않습니다.
+            // srcObject를 매번 새로 대입하면 비디오 파이프라인이 초기화되면서 깜빡임이 발생합니다.
+            if (mediaRef.current.srcObject !== stream) {
+                mediaRef.current.srcObject = stream;
+                mediaRef.current.play().catch((err) => {
+                    console.warn("미디어 자동재생 차단됨:", err.message);
+                    if (err.name === "NotAllowedError" || err.message.includes("play() failed")) {
+                        onBlocked();
+                    }
+                });
+            }
         }
+    }, [stream, onBlocked]); // 이펙트 재실행 시 srcObject를 null로 밀어버리는 코드를 제거함
 
-        // 💡 [추가] 컴포넌트 언마운트 시 미디어 할당 해제 (메모리 누수 및 카메라 자원 낭비 방지)
+    // 2. 💡 진짜 컴포넌트가 '언마운트' 될 때만 미디어 자원을 깔끔하게 해제하는 별도 Effect
+    useEffect(() => {
         return () => {
             if (mediaRef.current) {
                 mediaRef.current.srcObject = null;
             }
         };
-    }, [stream, onBlocked]);
+    }, []); // 의존성 배열을 비워둠으로써 화면에서 아예 사라질 때 딱 1번만 실행됩니다.
 
     if (isVideo) {
-        // 💡 [핵심 수정] 오디오 트랙이 없는 순수 비디오 스트림이면 muted를 강제로 부여!
-        // 이렇게 해야 iOS(아이폰) 및 모바일 크롬에서 사용자 터치 없이도 화면이 부드럽게 자동 재생됩니다.
         return (
             <video
                 ref={mediaRef as any}
@@ -519,7 +525,6 @@ function MediaRenderer({ stream, onBlocked }: { stream: MediaStream, onBlocked: 
             />
         );
     } else {
-        // 오디오는 화면을 차지하지 않도록 숨김 처리
         return <audio ref={mediaRef as any} autoPlay playsInline className="hidden" />;
     }
-}
+});
