@@ -309,8 +309,13 @@ export default function PrivateMentoringPage() {
               종료
             </button>
           ) : (
-            /* 멘티일 경우 버튼은 안 보이지만, 레이아웃 공간은 차지하도록 빈 div 유지 (선택사항) */
-            <div className="w-8"></div>
+            // 멘티일 경우 빈 공간 대신 '나가기' 버튼 렌더링 및 페이지 이동 연결
+            <button
+              onClick={() => window.location.href = "/mentoring_list/1on1_list"}
+              className="text-gray-500 hover:text-gray-700 font-bold text-[15px] p-1 transition-colors"
+            >
+              나가기
+            </button>
           )}
         </div>
 
