@@ -411,6 +411,26 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
 
                     // 💡 [수정] 위에서 만든 통합 헬퍼 함수를 호출합니다.
                     await requestConsume(producerId, kind);
+                } else if (message.event === "producer-closed") {
+                    // 상대방이 나가거나 연결이 끊겨 프로듀서가 닫힌 경우 자원 정리
+
+                    console.log("🚪 Producer closed:", message.data);
+                    const { producerId } = message.data;
+
+                    setRemoteStreams((prev) => {
+                        const newMap = new Map(prev);
+                        newMap.delete(producerId);
+                        return newMap;
+                    });
+
+                    for (const [consumerId, consumer] of consumersRef.current.entries()) {
+                        if (consumer.producerId === producerId) {
+                            consumer.close();
+                            consumersRef.current.delete(consumerId);
+                            console.log(`✅ Closed consumer for producer: ${producerId}`);
+                            break;
+                        }
+                    }
                 }
             } catch (err) {
                 console.error("Signal 처리 오류:", err);

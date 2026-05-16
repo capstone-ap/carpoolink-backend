@@ -174,7 +174,8 @@ export default function PrivateMentoringPage() {
     if (!remoteAudioRef.current || remoteStreams.size === 0) return;
 
     // 1:1 멘토링이므로 복잡한 병합(Merge) 없이 첫 번째 원격 스트림을 그대로 사용합니다.
-    const stream = Array.from(remoteStreams.values())[0];
+    const streamArray = Array.from(remoteStreams.values());
+    const stream = streamArray[streamArray.length - 1];
 
     // 🚨 [핵심] 이미 오디오 태그에 같은 스트림이 연결되어 있다면 덮어쓰지 않습니다.
     // (채팅을 입력할 때마다 srcObject가 재할당되어 미세하게 음성이 끊기는 현상을 원천 차단)
