@@ -169,33 +169,31 @@ export default function PrivateMentoringPage() {
     };
   }, [sessionData?.mentoringId, userId, userName, role]); // role 의존성 추가 권장
 
-  // 원격 오디오 스트림 수신 및 연결
+  // 1. 💡 최적화된 원격 오디오 스트림 수신 및 연결
   useEffect(() => {
-    if (remoteAudioRef.current && remoteStreams.size > 0) {
-      const combinedStream = new MediaStream();
+    if (!remoteAudioRef.current || remoteStreams.size === 0) return;
 
-      remoteStreams.forEach((stream) => {
-        stream.getAudioTracks().forEach((track) => {
-          if (!combinedStream.getTracks().find(t => t.id === track.id)) {
-            combinedStream.addTrack(track);
-          }
-        });
+    // 1:1 멘토링이므로 복잡한 병합(Merge) 없이 첫 번째 원격 스트림을 그대로 사용합니다.
+    const stream = Array.from(remoteStreams.values())[0];
+
+    // 🚨 [핵심] 이미 오디오 태그에 같은 스트림이 연결되어 있다면 덮어쓰지 않습니다.
+    // (채팅을 입력할 때마다 srcObject가 재할당되어 미세하게 음성이 끊기는 현상을 원천 차단)
+    if (remoteAudioRef.current.srcObject !== stream) {
+      remoteAudioRef.current.srcObject = stream;
+      remoteAudioRef.current.play().catch((err) => {
+        console.warn("오디오 재생 실패 (오토플레이 정책 등):", err);
       });
-
-      if (combinedStream.getAudioTracks().length > 0) {
-        remoteAudioRef.current.srcObject = combinedStream;
-        remoteAudioRef.current.play().catch((err) => {
-          console.error("오디오 재생 실패 (오토플레이 정책 등):", err);
-        });
-      }
     }
   }, [remoteStreams]);
 
+  // 2. 💡 [추가] 페이지 이탈 시 오디오 자원 완벽 해제 (메모리 누수 및 백그라운드 재생 방지)
   useEffect(() => {
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.muted = !isSpeakerOn;
-    }
-  }, [isSpeakerOn]);
+    return () => {
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = null;
+      }
+    };
+  }, []);
 
   // ✅ [새로운 타이머 로직] 서버 시간에 맞춰 동기화
   useEffect(() => {
