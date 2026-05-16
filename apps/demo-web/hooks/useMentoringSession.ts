@@ -47,8 +47,6 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
             const res = await apiClient.get(`/media/mentorings/${mentoringId}`);
             const data = res.data;
 
-            console.log("🔍 미디어 서버 응답 데이터:", data); // 데이터 구조 확인용
-
             if (isMountedRef.current) {
                 // 1. 서버 응답 구조 대응 (mentoring 객체 안에 있거나, 평평한 구조이거나)
                 const mentoringInfo = data.mentoring || data;
@@ -112,12 +110,6 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
                 }
                 console.log("Media server connected:", socket.id);
 
-                console.log("📤 [joinMentoring] 서버로 방 입장 요청 발송 데이터:", {
-                    mentoringId: Number(mentoringId),
-                    role: options.role,
-                    userId: options.userId?.toString() || "",
-                });
-
                 // joinMentoring 액션 발송
                 socket.emit(
                     "signal",
@@ -131,16 +123,13 @@ export function useMentoringSession(options: UseMentoringSessionOptions) {
                         },
                     },
                     (response: any) => {
-                        // 💡 [추가] 서버로부터 응답이 오면 조건문 이전에 무조건 찍히는 로그
-                        console.log("📩 [joinMentoring] 서버 응답 수신 완료:", response);
-
                         if (!isMountedRef.current) {
                             console.warn("⚠️ 서버 응답을 받았으나 컴포넌트가 이미 언마운트되었습니다.");
                             return;
                         }
 
                         if (response?.ok) {
-                            console.log("🎉 Joined mentoring 성공:", response.data);
+                            console.log("🎉 Joined mentoring");
                             setPeerId(response.data?.peerId || socket.id);
                             setIsConnected(true);
                         } else {

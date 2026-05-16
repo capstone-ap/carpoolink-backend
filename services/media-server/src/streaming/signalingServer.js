@@ -96,8 +96,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                 let result;
                 switch (action) {
                     case 'joinMentoring': {
-                        console.log('joinMentoring called');
-
                         try {
                             const mentoringId = Number(data.mentoringId);
                             const role = data.role ?? 'MENTEE';
@@ -153,7 +151,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                                 },
                                 peerId
                             );
-                            console.log('joinMentoring successful');
                             break;
                         } catch (error) {
                             console.error('joinMentoring error:', error);
@@ -165,7 +162,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                         }
                     }
                     case 'getRtpCapabilities': {
-                        console.log('getRtpCapabilities called');
                         const context = socketContext.get(socket.id);
 
                         if (!context) {
@@ -178,7 +174,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                         }
 
                         result = JSON.parse(JSON.stringify(room.router.rtpCapabilities));
-                        console.log('Returning RTP Capabilities');
                         break;
                     }
                     case 'createWebRtcTransport': {
@@ -352,7 +347,6 @@ export function createSignalingServer({ httpServer, mediaOrchestrator, mentoring
                 }
 
                 if (typeof callback === 'function') {
-                    console.log('response for callback:', { ok: true, data: result });
                     callback({ ok: true, data: result });
                 } else {
                     sendReply(socket, requestId, result);
