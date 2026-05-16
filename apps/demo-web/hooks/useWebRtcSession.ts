@@ -52,15 +52,9 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
         }
 
         try {
-            console.log("📷 Requesting getUserMedia...");
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: needsVideo ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false,
                 audio: needsAudio,
-            });
-
-            console.log("✅ Local stream acquired:", {
-                videoTracks: stream.getVideoTracks().length,
-                audioTracks: stream.getAudioTracks().length,
             });
 
             if (isMountedRef.current) {
@@ -94,8 +88,6 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                 throw new Error("소켓이 연결되지 않았습니다");
             }
 
-            console.log("🔧 Getting RTP Capabilities...");
-
             // RTP Capabilities 요청
             const response = await new Promise<{ data: any }>((resolve, reject) => {
                 config.socket?.emit("signal", {
@@ -103,7 +95,6 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     action: "getRtpCapabilities",
                     data: {},
                 }, (res: any) => {
-                    console.log("📩 RTP Capabilities 서버 응답:", res);
                     if (res?.ok) {
                         resolve(res);
                     } else {
@@ -112,8 +103,6 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     }
                 });
             });
-
-            console.log("🚀 Loading MediaSoup device...");
             const device = new Device();
             await device.load({ routerRtpCapabilities: response.data });
             console.log("✅ MediaSoup device loaded");
@@ -123,14 +112,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
         } catch (err) {
             const error = err as any;
 
-            console.error(`[❌ Device init error 발생!`);
-
-            // 직렬화하지 않고 객체 날것 그대로 콘솔에 출력 (화살표를 눌러 내부를 볼 수 있음)
-            console.error("1. Raw Error Object:", error);
-
-            // 프로토타입 체인을 무시하고 명시적으로 속성 추출
-            console.error("2. Error Details -> Name:", error?.name, " | Message:", error?.message);
-            console.error("3. Error Stack:", error?.stack);
+            console.error(`[❌ Device init error 발생!]`);
 
             if (isMountedRef.current) {
                 setError(error?.message || "Device 초기화 실패");
@@ -192,7 +174,6 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     });
 
                     sendTransportRef.current = transport;
-                    console.log("✅ Send transport created");
                     resolve(transport);
                 }
             );
@@ -223,7 +204,7 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     });
 
                     transport.on("connectionstatechange", (state) => {
-                        console.log("🚨 Recv transport state:", state);
+                        console.log("Recv transport state:", state);
                     });
 
                     transport.on("connect", async ({ dtlsParameters }, callback, errback) => {
@@ -249,7 +230,6 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     });
 
                     recvTransportRef.current = transport;
-                    console.log("✅ Recv transport created");
                     resolve(transport);
                 }
             )
@@ -392,8 +372,6 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                 action: "resumeConsumer",
                 data: { consumerId: rtpParams.consumerId }
             });
-            console.log(`✅ Resumed consumer: ${rtpParams.consumerId}`);
-
         } catch (err) {
             console.error("Failed to consume remote stream:", err);
         }
@@ -413,8 +391,6 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                     await requestConsume(producerId, kind);
                 } else if (message.event === "producer-closed") {
                     // 상대방이 나가거나 연결이 끊겨 프로듀서가 닫힌 경우 자원 정리
-
-                    console.log("🚪 Producer closed:", message.data);
                     const { producerId } = message.data;
 
                     setRemoteStreams((prev) => {
@@ -427,7 +403,6 @@ export function useWebRtcSession(config: WebRtcSessionConfig): WebRtcSessionStat
                         if (consumer.producerId === producerId) {
                             consumer.close();
                             consumersRef.current.delete(consumerId);
-                            console.log(`✅ Closed consumer for producer: ${producerId}`);
                             break;
                         }
                     }
