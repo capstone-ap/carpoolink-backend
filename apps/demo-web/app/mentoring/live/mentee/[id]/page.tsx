@@ -194,7 +194,8 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
 
         socket.on("room_closed", (data: any) => {
             setIsChatClosed(true);
-            alert("멘토링이 종료되어 채팅이 마감되었습니다.");
+            alert("멘토링이 종료되었습니다.");
+            window.location.href = "/mentoring_list/live_list";
         });
 
         socket.on("error", (err: any) => {

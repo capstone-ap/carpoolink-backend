@@ -31,6 +31,7 @@ export default function PrivateMentoringPage() {
   // 💡 실시간 채팅 상태
   const [chatSocket, setChatSocket] = useState<Socket | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]); // 더미 데이터 제거
+  const [isChatClosed, setIsChatClosed] = useState(false);
 
   useEffect(() => {
     const storedRole = localStorage.getItem("userRole")?.toUpperCase();
@@ -155,6 +156,12 @@ export default function PrivateMentoringPage() {
       }]);
     });
 
+    newChatSocket.on("room_closed", (data: any) => {
+      setIsChatClosed(true);
+      alert("멘토링이 종료되었습니다.");
+      window.location.href = "/mentoring_list/1on1_list";
+    });
+
     setChatSocket(newChatSocket);
 
     return () => {
@@ -237,7 +244,7 @@ export default function PrivateMentoringPage() {
   // 💡 [수정된 채팅 전송 함수]
   const handleSendMessage = () => {
     // 1. 방어 로직 (내용이 없거나, 소켓이 없거나, 방 번호가 없으면 중단)
-    if (!chatInput.trim() || !chatSocket || !sessionData?.mentoringId) {
+    if (!chatInput.trim() || !chatSocket || !sessionData?.mentoringId || isChatClosed) {
       console.warn("⚠️ 전송 불가 상태:", { input: chatInput, socket: !!chatSocket, roomId: sessionData?.mentoringId });
       return;
     }
@@ -290,7 +297,7 @@ export default function PrivateMentoringPage() {
             <h1 className="text-[17px] font-extrabold tracking-tight text-[#1A1A1A]">
               {opponentNickname}
             </h1>
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+            <div className={`w-2 h-2 rounded-full ${(isConnected && !isChatClosed) ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
           </div>
           <span className="text-[12px] font-medium text-gray-500 mt-0.5 font-mono tracking-tight">
             {formatTime(elapsedTime)}
@@ -393,9 +400,9 @@ export default function PrivateMentoringPage() {
             </div>
 
             {messages.length === 0 ? (
-               <div className="h-full flex items-center justify-center text-gray-500 text-sm">
-                  메시지를 입력해 첫 인사를 나눠보세요.
-               </div>
+              <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+                메시지를 입력해 첫 인사를 나눠보세요.
+              </div>
             ) : (
               messages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2`}>
