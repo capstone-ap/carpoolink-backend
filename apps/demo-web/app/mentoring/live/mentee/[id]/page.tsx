@@ -19,6 +19,8 @@ interface ChatMessage {
     author: string;
     senderId: string;
     content: string;
+    isQuestion?: boolean;
+    questionId?: string | null;
 }
 
 // ============================================================================
@@ -50,7 +52,7 @@ export default function LiveMentoringPage() {
                 setUserId(parsedUserId);
 
                 try {
-                    await apiClient.post(`/api/mentorings/${mentoringId}/join`);
+                    await apiClient.post(`/mentorings/${mentoringId}/join`);
 
                     // 성공 시 진짜 방 화면으로 전환
                     setIsReady(true);
@@ -186,6 +188,8 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
                 author: m.user?.nickname || m.userName || "익명멘티",
                 senderId: String(m.userId),
                 content: m.content.replace("[유료] ", ""),
+                isQuestion: m.isQuestion, 
+                questionId: m.questionId,
             }]);
         });
 
@@ -399,18 +403,38 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
                                     className="w-9 h-9 rounded-full object-cover shrink-0 bg-gray-800 border-2 border-[#FFCC00]"
                                 />
 
-                                <div className="flex flex-col items-start">
+                                {/* 💡 넓이를 차지하도록 w-full 추가 */}
+                                <div className="flex flex-col items-start w-full">
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="text-sm font-semibold text-gray-400">{chat.author}</span>
+                                        
+                                        {/* 기존 유료 질문 배지 */}
                                         {chat.type === 'paid' && (
                                             <span className="bg-[#FFCC00] text-[#1A1A1A] text-[10px] font-extrabold px-1.5 py-0.5 rounded tracking-wide">
                                                 유료 질문
                                             </span>
                                         )}
+                                        
+                                        {/* 💡 [추가] 일반 질문 배지 (유료가 아니면서 isQuestion이 true일 때) */}
+                                        {chat.isQuestion && chat.type !== 'paid' && (
+                                            <span className="bg-blue-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                                                💡 질문
+                                            </span>
+                                        )}
                                     </div>
-                                    <p className={`text-[15px] break-all leading-relaxed ${chat.type === 'paid' ? 'text-[#FFCC00]' : 'text-gray-100'}`}>
+                                    
+                                    {/* 💡 [수정] 질문 여부에 따른 말풍선 조건부 스타일링 */}
+                                    <div 
+                                        className={`text-[15px] break-all leading-relaxed ${
+                                            chat.type === 'paid' 
+                                                ? 'text-[#FFCC00]' // 유료 질문 텍스트 스타일
+                                                : chat.isQuestion 
+                                                    ? 'bg-blue-900/30 border border-blue-500/50 text-blue-50 px-3 py-2 rounded-2xl rounded-tl-sm w-fit max-w-[90%]' // 🎯 일반 질문 말풍선
+                                                    : 'text-gray-100' // 일반 채팅 텍스트 스타일
+                                        }`}
+                                    >
                                         {chat.content}
-                                    </p>
+                                    </div>
                                 </div>
                             </div>
                         );
