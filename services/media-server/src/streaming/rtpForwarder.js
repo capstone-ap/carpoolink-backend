@@ -82,6 +82,10 @@ export class RtpForwarder {
             'pipe:1',
         ]);
 
+        ffmpeg.on('error', (err) => {
+            console.error('[RtpForwarder] FFmpeg 실행 실패:', err);
+        });
+
         const state = {
             plainTransport, consumer, ffmpeg, sdpPath, port,
             pcmBuffer: Buffer.alloc(0),
