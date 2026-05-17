@@ -113,6 +113,7 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
     const [chatInput, setChatInput] = useState("");
     const [isAiOpen, setIsAiOpen] = useState(false);
     const [isAutoplayBlocked, setIsAutoplayBlocked] = useState(false);
+    const [isPrivateQuestion, setIsPrivateQuestion] = useState(false);
 
     const [chatSocket, setChatSocket] = useState<Socket | null>(null);
     const [chats, setChats] = useState<ChatMessage[]>([]);
@@ -254,16 +255,23 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
     const confirmPaidQuestion = () => {
         setIsPopupOpen(false);
         if (chatSocket && !isChatClosed) {
-            const payload = {
-                mentoringId,
-                userId: String(userId),
-                userName,
-                content: `[유료] ${chatInput}`
-            };
-
-            chatSocket.emit("send_message", payload);
-            setChatInput("");
-            setIsPaidMode(false);
+            // 유료 질문은 core-api에 등록하여 잔액 차감 및 실시간 이벤트 전파를 수행합니다.
+            (async () => {
+                try {
+                    await apiClient.post(`/api/mentorings/${mentoringId}/questions`, {
+                        content: chatInput,
+                        isPaid: true,
+                        isPrivate: isPrivateQuestion,
+                    });
+                    // 등록 성공하면 입력 초기화
+                    setChatInput("");
+                    setIsPaidMode(false);
+                    setIsPrivateQuestion(false);
+                } catch (err: any) {
+                    console.error('유료 질문 등록 실패', err);
+                    alert(err?.response?.data?.message || '유료 질문 전송에 실패했습니다.');
+                }
+            })();
         }
     };
 
@@ -435,20 +443,22 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
                         </>
                     )}
 
-                    <div className="relative flex items-center w-full">
-                        <input
-                            type="text"
-                            value={chatInput}
-                            onChange={(e) => setChatInput(e.target.value)}
-                            disabled={isChatClosed}
-                            placeholder={isChatClosed ? "멘토링이 종료되어 채팅을 입력할 수 없습니다." : "메시지를 입력해주세요... (최대 200자)"}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                            className="w-full bg-[#222222] disabled:opacity-60 disabled:cursor-not-allowed text-white border-none rounded-2xl py-4 pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 placeholder-gray-500 text-[15px] shadow-sm"
-                            maxLength={200}
-                        />
-                        <button disabled={isChatClosed || !chatInput.trim()} onClick={handleSend} className="absolute right-3 p-2 text-[#FFCC00] disabled:text-gray-600 hover:bg-[#FFCC00]/10 rounded-xl transition-colors active:scale-90">
-                            <Send className="w-5 h-5" />
-                        </button>
+                    <div className="relative flex items-end gap-3 w-full">
+                        <div className="relative flex items-center w-full">
+                            <input
+                                type="text"
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                disabled={isChatClosed}
+                                placeholder={isChatClosed ? "멘토링이 종료되어 채팅을 입력할 수 없습니다." : "메시지를 입력해주세요... (최대 200자)"}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                className="w-full bg-[#222222] disabled:opacity-60 disabled:cursor-not-allowed text-white border-none rounded-2xl py-4 pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 placeholder-gray-500 text-[15px] shadow-sm"
+                                maxLength={200}
+                            />
+                            <button disabled={isChatClosed || !chatInput.trim()} onClick={handleSend} className="absolute right-3 p-2 text-[#FFCC00] disabled:text-gray-600 hover:bg-[#FFCC00]/10 rounded-xl transition-colors active:scale-90">
+                                <Send className="w-5 h-5" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -465,7 +475,23 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
                             </button>
                         </div>
                         <h3 className="text-xl font-bold text-white mb-2">유료 질문을 전송할까요?</h3>
-                        <p className="text-gray-400 text-[15px] mb-6 leading-relaxed">보유하신 <strong className="text-[#FFCC00]">질문권 1개</strong>가 차감되며, 멘토에게 최우선으로 전달됩니다.</p>
+                        <p className="text-gray-400 text-[15px] mb-4 leading-relaxed">보유하신 <strong className="text-[#FFCC00]">질문권 1개</strong>가 차감되며, 멘토에게 최우선으로 전달됩니다.</p>
+
+                        <div className="mb-4">
+                            <div className="flex items-center justify-between">
+                                <div className="text-white font-semibold">비공개 질문</div>
+                                <label className="inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={isPrivateQuestion}
+                                        onChange={(e) => setIsPrivateQuestion(e.target.checked)}
+                                        className="w-5 h-5 accent-[#FFCC00]"
+                                    />
+                                </label>
+                            </div>
+                            <p className="text-gray-400 text-sm mt-2">비공개 질문 선택시 질문과 답변이 다른 멘티들에게 공개되지 않습니다.</p>
+                        </div>
+
                         <div className="flex gap-3">
                             <button onClick={() => setIsPopupOpen(false)} className="flex-1 bg-gray-800 text-white font-bold py-3.5 rounded-xl hover:bg-gray-700 transition-colors active:scale-95">취소</button>
                             <button onClick={confirmPaidQuestion} className="flex-1 bg-[#FFCC00] text-[#1A1A1A] font-bold py-3.5 rounded-xl hover:bg-[#E6B800] transition-colors active:scale-95">보내기</button>

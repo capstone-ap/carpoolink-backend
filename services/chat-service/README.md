@@ -42,3 +42,20 @@ npm run dev -w services/chat-service
 - Client -> Server: `join_chat`, `send_message`, `get_message_history`, `get_online_users`, `leave_chat`
 - Server -> Client: `new_message`, `user_joined`, `user_left`, `message_history`, `online_users`, `room_closed`
 
+### Internal API (core-api 간 통신)
+
+#### 질문 이벤트 수신
+
+- `POST /internal/questions/events`: core-api에서 질문 상태 변경 시 호출됩니다.
+  - 요청 본문:
+    ```json
+    {
+        "mentoringId": "123456",
+        "event": "question:registered" | "question:acknowledged" | "question:completed",
+        "payload": {
+            "question": { /* 질문 정보 */ }
+        }
+    }
+    ```
+  - 이벤트 수신 후 Socket.io를 통해 멘토링 룸의 클라이언트들에게 실시간으로 브로드캐스트됩니다.
+

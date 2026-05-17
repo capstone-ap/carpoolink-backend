@@ -7,7 +7,9 @@ import {
     closeMentoringRoom,
 } from './socket/socketHandler.js';
 import chatsRouter from './routes/chats.js';
+import questionEventsRouter from './routes/questionEvents.js';
 import { PrismaClient } from '@carpoolink/database';
+import { setChatIo } from './lib/socketHub.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -24,7 +26,7 @@ app.use(express.urlencoded({ extended: true }));
 // Socket.io 설정
 const io = new Server(httpServer, {
     // /chat 경로로 소켓을 받음.
-    path: '/chat/socket.io', 
+    path: '/chat/socket.io',
     cors: {
         origin: CORS_ORIGIN,
         methods: ['GET', 'POST'],
@@ -33,8 +35,11 @@ const io = new Server(httpServer, {
     transports: ['websocket', 'polling'],
 });
 
+setChatIo(io);
+
 // 라우트 등록
 app.use('/chats', chatsRouter);
+app.use('/internal/questions', questionEventsRouter);
 
 // Health check 엔드포인트
 app.get('/health', (req, res) => {

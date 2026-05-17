@@ -58,6 +58,7 @@ model User {
   mentoringHistories MentoringHistory[]
   hostedMentorings   Mentoring[]        @relation("HostedMentorings")
   askedQuestions     Question[]
+  answeredQuestions   Question[]        @relation("AnsweredQuestions")
   scripts            Script[]
   chats              MentoringChat[]
 
@@ -152,11 +153,15 @@ model Question {
   priorityScore Float           @default(0) @map("priority_score")
   status        QuestionStatus  @default(BEFORE) @map("status")
   createdAt     DateTime        @default(now()) @map("created_at")
+  answerContent String?         @db.VarChar(500) @map("answer_content")
+  answeredAt    DateTime?       @map("answered_at")
   userId        BigInt          @map("user_id")
   mentoringId   BigInt          @map("mentoring_id")
+  answeredByUserId BigInt?      @map("answered_by_user_id")
 
   // 관계 설정
   user      User      @relation(fields: [userId], references: [userId])
+  answerer  User?     @relation("AnsweredQuestions", fields: [answeredByUserId], references: [userId])
   mentoring Mentoring @relation(fields: [mentoringId], references: [mentoringId])
 
   @@map("questions")
