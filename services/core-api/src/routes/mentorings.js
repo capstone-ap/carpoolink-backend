@@ -239,7 +239,7 @@ router.post('/:id/questions', requireUser, async (req, res, next) => {
         }
 
         const isPaid = Boolean(req.body?.isPaid);
-        const isPrivate = req.body?.isPrivate === undefined ? isPaid : Boolean(req.body.isPrivate);
+        const isPrivate = req.body?.isPrivate === undefined ? false : Boolean(req.body.isPrivate);
 
         const mentoring = await prisma.mentoring.findFirst({
             where: {
