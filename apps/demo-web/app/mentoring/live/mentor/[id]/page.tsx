@@ -13,7 +13,7 @@ import apiClient from "@/lib/apiClient";
 
 interface Question {
     id: number;
-    type: "free" | "paid";
+    isPaid: boolean;
     isPrivate: boolean;
     author: string;
     avatar: string;
@@ -22,7 +22,6 @@ interface Question {
 
 interface ChatMessage {
     id: string | number;
-    type: "free" | "paid";
     author: string;
     senderId: string;
     content: string;
@@ -102,12 +101,14 @@ function MentorLiveContent({ mentoringId, role, userId, userName }: { mentoringI
             if (!mentoringId) return;
             setIsLoadingQuestions(true);
             try {
-                const response = await apiClient.get(`/api/mentorings/${mentoringId}/questions`);
+                const response = await apiClient.get(`/api/mentorings/${mentoringId}/questions`, {
+                    params: { status: "BEFORE" }
+                });
                 if (response.data?.questions) {
                     // API 응답에서 필요한 필드만 추출하여 Question 타입으로 변환
                     const mappedQuestions = response.data.questions.map((q: any) => ({
                         id: q.questionId,
-                        type: q.paid ? "paid" : "free",
+                        isPaid: q.paid || false,
                         isPrivate: q.status === "PRIVATE",
                         author: q.user?.nickname || "익명멘티",
                         avatar: "👤",
@@ -150,10 +151,48 @@ function MentorLiveContent({ mentoringId, role, userId, userName }: { mentoringI
             });
         });
 
+        // 질문 이벤트 실시간 처리: 등록/완료
+        newSocket.on('question:registered', (data: any) => {
+            try {
+                const q = data?.question;
+                if (!q) return;
+                const mapped: Question = {
+                    id: Number(q.questionId),
+                    isPaid: q.isPaid || false,
+                    isPrivate: q.isPrivate || false,
+                    author: q.user?.nickname || '익명멘티',
+                    avatar: '👤',
+                    content: q.content,
+                };
+
+                setQuestions((prev) => {
+                    if (prev.some(p => p.id === mapped.id)) return prev;
+                    return [...prev, mapped];
+                });
+            } catch (e) {
+                console.error('question:registered 처리 중 에러', e);
+            }
+        });
+
+        newSocket.on('question:completed', (data: any) => {
+            try {
+                const q = data?.question;
+                if (!q) return;
+                const removeId = Number(q.questionId);
+                setQuestions((prev) => {
+                    const next = prev.filter(p => p.id !== removeId);
+                    // 현재 인덱스가 새 배열의 범위를 넘지 않도록 조정
+                    setCurrentIdx((idx) => Math.max(0, Math.min(idx, Math.max(0, next.length - 1))));
+                    return next;
+                });
+            } catch (e) {
+                console.error('question:completed 처리 중 에러', e);
+            }
+        });
+
         newSocket.on("message_history", (messages: any[]) => {
             const mapped = messages.map(m => ({
                 id: m.mentoringChatId,
-                type: m.content.startsWith("[유료]") ? "paid" : "free",
                 author: m.user?.nickname || m.userName || "익명멘티",
                 senderId: String(m.userId),
                 content: m.content.replace("[유료] ", ""),
@@ -295,7 +334,7 @@ function MentorLiveContent({ mentoringId, role, userId, userName }: { mentoringI
                             질문이 없습니다.
                         </div>
                     ) : currentQuestion ? (
-                        <div className={`w-full rounded-[24px] p-5 mb-4 shrink-0 shadow-xl flex justify-between gap-4 ${currentQuestion.type === 'paid' ? 'bg-[#FFCC00] text-[#1A1A1A]' : 'bg-[#F0F0F0] text-[#1A1A1A]'}`}>
+                        <div className={`w-full rounded-[24px] p-5 mb-4 shrink-0 shadow-xl flex justify-between gap-4 ${currentQuestion.isPaid ? 'bg-[#FFCC00] text-[#1A1A1A]' : 'bg-[#F0F0F0] text-[#1A1A1A]'}`}>
                             <div className="flex flex-col gap-3 flex-1">
                                 <div className="flex items-center justify-between w-full">
                                     <div className="flex items-center gap-2">

@@ -13,6 +13,12 @@ function parseMentoringStatus(status) {
     return ['READY', 'ON_AIR', 'COMPLETED'].includes(normalized) ? normalized : 'ON_AIR';
 }
 
+function parseQuestionStatus(status) {
+    if (!status) return undefined;
+    const normalized = String(status).toUpperCase();
+    return ['BEFORE', 'ANSWERING', 'COMPLETED'].includes(normalized) ? normalized : 'BEFORE';
+}
+
 function parseBigIntId(value) {
     try {
         if (value === undefined || value === null || value === '') {
@@ -151,6 +157,8 @@ router.get('/group', async (req, res, next) => {
 router.get('/:id/questions', requireUser, async (req, res, next) => {
     try {
         const mentoringId = parseBigIntId(req.params.id);
+        const status = parseQuestionStatus(req.query.status);
+
         if (!mentoringId) {
             return res.status(400).json({ message: '유효하지 않은 mentoringId입니다.' });
         }
@@ -165,7 +173,10 @@ router.get('/:id/questions', requireUser, async (req, res, next) => {
         }
 
         const questions = await prisma.question.findMany({
-            where: { mentoringId },
+            where: {
+                mentoringId: mentoringId,
+                status: status
+            },
             include: {
                 user: {
                     select: {

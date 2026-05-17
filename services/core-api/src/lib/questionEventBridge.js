@@ -1,3 +1,5 @@
+import { serialize } from '../utils/serialize.js';
+
 function getChatServiceUrl() {
     return process.env.CHAT_SERVICE_URL || 'http://localhost:4001';
 }
@@ -11,11 +13,11 @@ export async function emitQuestionEvent({ mentoringId, event, payload }) {
             headers: {
                 'content-type': 'application/json',
             },
-            body: JSON.stringify({
-                mentoringId: Number(mentoringId),
+            body: JSON.stringify(serialize({
+                mentoringId: mentoringId.toString(),
                 event,
                 payload,
-            }),
+            })),
         });
 
         if (!response.ok) {
