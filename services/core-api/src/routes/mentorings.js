@@ -184,12 +184,6 @@ router.get('/:id/questions', requireUser, async (req, res, next) => {
                         nickname: true,
                     },
                 },
-                answerer: {
-                    select: {
-                        userId: true,
-                        nickname: true,
-                    },
-                },
             },
             orderBy: [
                 { createdAt: 'asc' },
