@@ -25,35 +25,72 @@ const FALLBACK = {
     rankingMode: 'fallback',
     warnings: ['AI embedding scores unavailable; fallback scores applied.'],
 };
-const TIMEOUT_MS = 60_000;  // 모델 로딩 포함
+const TIMEOUT_MS = 60_000;
+
+function getModelApiUrl() {
+    const rawValue = process.env.QUESTION_MODEL_API_URL;
+    if (!rawValue) {
+        return null;
+    }
+
+    return rawValue.replace(/\/+$/, '');
+}
 
 function getPythonExecutable() {
     return process.env.QUESTION_SERVICE_PYTHON || 'python';
 }
 
-export async function fetchAiScores(request) {
-    try {
-        const { stdout, stderr } = await execFileAsync(
-            getPythonExecutable(),
-            [DEFAULT_SCRIPT_PATH, '--input', JSON.stringify(request)],
-            { cwd: serviceRoot, timeout: TIMEOUT_MS, maxBuffer: 1024 * 1024 },
-        );
+function normalizeAiScoreResponse(data, rankingMode = 'hybrid') {
+    return {
+        relevance:   clamp(data.relevance),
+        flowFit:     clamp(data.flow_fit ?? data.flowFit),
+        expertise:   clamp(data.expertise),
+        redundancyPenalty: clamp(data.redundancy_penalty ?? data.redundancyPenalty ?? 0),
+        rankingMode,
+        warnings: [],
+    };
+}
 
-        if (stderr && stderr.trim()) {
-            console.warn('[answerability] python stderr:', stderr.trim());
+async function fetchAiScoresViaModelApi(request, modelApiUrl) {
+    const response = await fetch(`${modelApiUrl}/question-ranking/scores`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+    });
+    const responseBody = await response.text();
+
+    if (!response.ok) {
+        throw new Error(`Question ranking model API failed with status ${response.status}: ${responseBody}`);
+    }
+
+    return normalizeAiScoreResponse(JSON.parse(responseBody), 'hybrid');
+}
+
+async function fetchAiScoresViaPythonCli(request) {
+    const { stdout, stderr } = await execFileAsync(
+        getPythonExecutable(),
+        [DEFAULT_SCRIPT_PATH, '--input', JSON.stringify(request)],
+        { cwd: serviceRoot, timeout: TIMEOUT_MS, maxBuffer: 1024 * 1024 },
+    );
+
+    if (stderr && stderr.trim()) {
+        console.warn('[answerability] python stderr:', stderr.trim());
+    }
+
+    return normalizeAiScoreResponse(JSON.parse(stdout), 'hybrid');
+}
+
+export async function fetchAiScores(request) {
+    const modelApiUrl = getModelApiUrl();
+
+    try {
+        if (modelApiUrl) {
+            return await fetchAiScoresViaModelApi(request, modelApiUrl);
         }
 
-        const data = JSON.parse(stdout);
-        return {
-            relevance:   clamp(data.relevance),
-            flowFit:     clamp(data.flow_fit),
-            expertise:   clamp(data.expertise),
-            redundancyPenalty: clamp(data.redundancy_penalty ?? 0),
-            rankingMode: 'hybrid',
-            warnings: [],
-        };
+        return await fetchAiScoresViaPythonCli(request);
     } catch (err) {
-        console.warn('[answerability] Python 추론 실패, fallback 적용:', err.message);
+        console.warn('[answerability] AI scoring failed, fallback applied:', err.message);
         return FALLBACK;
     }
 }

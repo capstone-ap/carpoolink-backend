@@ -15,9 +15,11 @@ SERVICE_ROOT = APP_DIR.parent
 REPO_ROOT = SERVICE_ROOT.parent.parent
 QUESTION_DETECTION_SCRIPT_DIR = SERVICE_ROOT / "scripts" / "question-detection"
 QUESTION_CLUSTERING_SCRIPT_DIR = SERVICE_ROOT / "scripts" / "question-clustering"
+QUESTION_RANKING_SCRIPT_DIR = SERVICE_ROOT / "scripts" / "question-ranking"
 
 sys.path.insert(0, str(QUESTION_DETECTION_SCRIPT_DIR))
 sys.path.insert(0, str(QUESTION_CLUSTERING_SCRIPT_DIR))
+sys.path.insert(0, str(QUESTION_RANKING_SCRIPT_DIR))
 
 from question_detection_inference import (  # noqa: E402
     HybridQuestionDetector,
@@ -26,6 +28,14 @@ from question_detection_inference import (  # noqa: E402
 from question_clustering_inference import (  # noqa: E402
     QuestionClusterer,
     QuestionClusteringConfig,
+)
+from compute_embedding_scores import (  # noqa: E402
+    compute_expertise,
+    compute_flow_fit,
+    compute_redundancy_penalty,
+    compute_relevance,
+    get_model,
+    normalize_text_list,
 )
 
 
@@ -44,6 +54,21 @@ class QuestionClusteringRequest(BaseModel):
     similarity_mode: str | None = None
     embeddingModel: str | None = None
     embedding_model: str | None = None
+
+
+class QuestionRankingScoresRequest(BaseModel):
+    question: str
+    session_topic: str = ""
+    previous_script_sections: list[str] = Field(default_factory=list)
+    current_script_section: str = ""
+    current_slide_title: str = ""
+    next_script_section: str = ""
+    recent_mentor_utterances: list[str] = Field(default_factory=list)
+    mentor_profile: str = ""
+    mentor_expertise_evidence: list[str] = Field(default_factory=list)
+    mentor_past_scripts: list[str] = Field(default_factory=list)
+    answered_questions: list[str] = Field(default_factory=list)
+    queued_questions: list[str] = Field(default_factory=list)
 
 
 class HealthResponse(BaseModel):
@@ -154,3 +179,49 @@ def cluster_questions(request: QuestionClusteringRequest) -> dict[str, Any]:
         return clusterer.cluster(payload, build_clustering_config())
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/question-ranking/scores")
+def score_question_ranking(request: QuestionRankingScoresRequest) -> dict[str, float]:
+    if not request.question.strip():
+        raise HTTPException(status_code=400, detail="question must be a non-empty string.")
+
+    model = get_model()
+    previous_script_sections = normalize_text_list(request.previous_script_sections)
+    recent_mentor_utterances = normalize_text_list(request.recent_mentor_utterances)
+    mentor_expertise_evidence = normalize_text_list(request.mentor_expertise_evidence)
+    mentor_past_scripts = normalize_text_list(request.mentor_past_scripts)
+    answered_questions = normalize_text_list(request.answered_questions)
+    queued_questions = normalize_text_list(request.queued_questions)
+
+    return {
+        "relevance": compute_relevance(
+            model,
+            request.question,
+            request.session_topic,
+            recent_mentor_utterances,
+            previous_script_sections,
+        ),
+        "flow_fit": compute_flow_fit(
+            model,
+            request.question,
+            previous_script_sections,
+            request.current_script_section,
+            request.current_slide_title,
+            request.next_script_section,
+        ),
+        "expertise": compute_expertise(
+            model,
+            request.question,
+            request.mentor_profile,
+            mentor_expertise_evidence,
+            previous_script_sections,
+            mentor_past_scripts,
+        ),
+        "redundancy_penalty": compute_redundancy_penalty(
+            model,
+            request.question,
+            answered_questions,
+            queued_questions,
+        ),
+    }
