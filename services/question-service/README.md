@@ -1,6 +1,7 @@
 # question-service
 
-Question detection and question clustering service for live mentoring sessions.
+Question detection, clustering, ranking, and recommendation service for live
+mentoring sessions.
 
 ## Run
 
@@ -18,9 +19,9 @@ npm run dev -w services/question-service
 
 ## Python model API
 
-The question detection model can also run as a long-lived FastAPI process so
-the Python model artifacts are loaded once and reused across requests. The same
-model API also exposes question clustering.
+The Python model logic can run as a long-lived FastAPI process so model
+artifacts are loaded once and reused across requests. The model API exposes
+question detection, question clustering, and ranking embedding scores.
 
 Install the Python dependencies:
 
@@ -88,10 +89,44 @@ Response fields include `cluster_count`, `clusters`, and per-question
 `assignments` with `rule_score`, optional `embedding_score`, and final
 `similarity_score`.
 
+### `POST /api/questions/rank`
+
+For one question, send `question` plus optional live-session context. For a
+clustered question list, call `/api/question-clustering/cluster` first, then pass
+that result as `clustering`.
+
+```json
+{
+  "sessionTopic": "React state management",
+  "currentScriptSection": "useState updates are reflected on the next render.",
+  "questions": [
+    { "id": "q1", "text": "Why does useState not update immediately?", "isPaid": true },
+    { "id": "q2", "text": "When does useEffect run?", "isPaid": false }
+  ],
+  "clustering": {
+    "question_count": 2,
+    "cluster_count": 1,
+    "threshold": 0.5,
+    "similarity_mode": "rule",
+    "clusters": [
+      {
+        "cluster_id": "cluster_1",
+        "representative_question_id": "q1",
+        "representative_question": "Why does useState not update immediately?",
+        "member_questions": [
+          { "question_id": "q1", "text": "Why does useState not update immediately?" },
+          { "question_id": "q2", "text": "When does useEffect run?" }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ## Environment Variables
 
 - `QUESTION_SERVICE_PORT`: HTTP port. Defaults to `4003`.
-- `QUESTION_MODEL_API_URL`: FastAPI model API base URL. When set, question detection and clustering use HTTP instead of spawning Python subprocesses.
+- `QUESTION_MODEL_API_URL`: FastAPI model API base URL. When set, question detection, clustering, and ranking embedding scoring use HTTP instead of spawning Python subprocesses.
 - `QUESTION_SERVICE_PYTHON`: Python executable path for inference and clustering.
 - `QUESTION_DETECTION_SCRIPT_PATH`: override hybrid detection script path.
 - `QUESTION_TFIDF_ARTIFACT_DIR`: TF-IDF artifact directory.
