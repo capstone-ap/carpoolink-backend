@@ -479,7 +479,11 @@ function MentorLiveContent({ mentoringId, role, userId, userName }: { mentoringI
                             ) : (
                                 chats.map((chat) => (
                                     <div key={chat.id} className="flex gap-3">
-                                        <div className="w-9 h-9 rounded-full bg-gray-800 border-2 border-[#FFCC00] shrink-0" />
+                                        <img 
+                                            src="/images/mentee_profile.jpg" 
+                                            alt={`${chat.author} 프로필`}
+                                            className="w-9 h-9 rounded-full border-2 border-[#FFCC00] shrink-0 object-cover bg-gray-800" 
+                                        />
                                         {/* 넓이를 차지하도록 w-full 추가 */}
                                         <div className="flex flex-col items-start w-full"> 
                                             <div className="flex items-center gap-2 mb-1">
