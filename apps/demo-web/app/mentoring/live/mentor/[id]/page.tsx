@@ -246,6 +246,8 @@ function MentorLiveContent({ mentoringId, role, userId, userName }: { mentoringI
                 author: m.user?.nickname || m.userName || "익명멘티",
                 senderId: String(m.userId),
                 content: m.content.replace("[유료] ", ""),
+                isQuestion: m.isQuestion, 
+                questionId: m.questionId,
             })) as ChatMessage[];
             setChats(mapped);
         });
@@ -471,54 +473,33 @@ function MentorLiveContent({ mentoringId, role, userId, userName }: { mentoringI
                     <div className="flex-1 flex flex-col mt-4 animate-in fade-in slide-in-from-bottom-8 duration-500 overflow-hidden">
                         <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pb-6 pr-2">
                             
-                            {/* 💡 수정됨: 채팅이 0개일 때 빈 화면 표시, 아닐 때 채팅 목록 렌더링 */}
-                            {chats.length === 0 ? (
+                            {/* 유료 질문을 제외한 순수 채팅 개수만 체크 */}
+                            {chats.filter((chat) => chat.type !== 'paid').length === 0 ? (
                                 <div className="h-full flex items-center justify-center text-gray-500 text-sm">
                                     아직 대화 내용이 없습니다.
                                 </div>
                             ) : (
-                                chats.map((chat) => (
-                                    <div key={chat.id} className="flex gap-3">
-                                        <img 
-                                            src="/images/mentee_profile.jpg" 
-                                            alt={`${chat.author} 프로필`}
-                                            className="w-9 h-9 rounded-full border-2 border-[#FFCC00] shrink-0 object-cover bg-gray-800" 
-                                        />
-                                        {/* 넓이를 차지하도록 w-full 추가 */}
-                                        <div className="flex flex-col items-start w-full"> 
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-sm font-semibold text-gray-400">{chat.author}</span>
+                                chats
+                                    // 유료 질문은 채팅창 화면에 아예 렌더링하지 않음.
+                                    .filter((chat) => chat.type !== 'paid')
+                                    .map((chat) => (
+                                        <div key={chat.id} className="flex gap-3">
+                                            <img 
+                                                src="/images/mentee_profile.jpg" 
+                                                alt={`${chat.author} 프로필`}
+                                                className="w-9 h-9 rounded-full border-2 border-[#FFCC00] shrink-0 object-cover bg-gray-800" 
+                                            />
+                                            <div className="flex flex-col items-start w-full"> 
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-sm font-semibold text-gray-400">{chat.author}</span>
+                                                </div>
                                                 
-                                                {/* 기존 유료 질문 배지 */}
-                                                {chat.type === 'paid' && (
-                                                    <span className="bg-[#FFCC00] text-[#1A1A1A] text-[10px] font-extrabold px-1.5 py-0.5 rounded">
-                                                        유료 질문
-                                                    </span>
-                                                )}
-                                                
-                                                {/* 💡 [추가] 일반 질문 배지 (유료가 아니면서 isQuestion이 true일 때) */}
-                                                {chat.isQuestion && chat.type !== 'paid' && (
-                                                    <span className="bg-blue-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
-                                                        💡 질문
-                                                    </span>
-                                                )}
-                                            </div>
-                                            
-                                            {/* 💡 [수정] 질문 여부에 따른 말풍선 조건부 스타일링 */}
-                                            <div 
-                                                className={`text-[15px] leading-relaxed break-all ${
-                                                    chat.type === 'paid' 
-                                                        ? 'text-[#FFCC00]' // 유료 질문 텍스트 스타일
-                                                        : chat.isQuestion 
-                                                            ? 'bg-blue-900/30 border border-blue-500/50 text-blue-50 px-3 py-2 rounded-2xl rounded-tl-sm w-fit max-w-[90%]' // 🎯 질문 말풍선 (다크 테마 호환 파란색)
-                                                            : 'text-gray-100' // 일반 채팅 텍스트 스타일
-                                                }`}
-                                            >
-                                                {chat.content}
+                                                <div className="text-[15px] leading-relaxed break-all text-gray-100">
+                                                    {chat.content}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))
+                                    ))
                             )}
                             <div ref={messagesEndRef} />
                         </div>

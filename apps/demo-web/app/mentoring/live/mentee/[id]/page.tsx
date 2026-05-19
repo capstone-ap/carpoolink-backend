@@ -177,6 +177,8 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
                 author: m.user?.nickname || m.userName || "익명멘티",
                 senderId: String(m.userId),
                 content: m.content.replace("[유료] ", ""),
+                isQuestion: m.isQuestion,
+                questionId: m.questionId,
             })) as ChatMessage[];
             setChats(mapped);
         });
@@ -386,59 +388,39 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-5 z-10 custom-scrollbar">
-                {chats.length === 0 ? (
+                {/* 유료 질문을 제외한 순수 채팅 개수만 체크 */}
+                {chats.filter((chat) => chat.type !== 'paid').length === 0 ? (
                     <div className="h-full flex items-center justify-center text-gray-500 text-sm">
                         채팅 내역이 없습니다. 첫 인사를 남겨보세요!
                     </div>
                 ) : (
-                    chats.map((chat) => {
-                        const isMentor = sessionData?.host?.userId && String(chat.senderId) === String(sessionData.host.userId);
-                        const profileImage = isMentor ? "/images/mentor_profile.jpg" : "/images/mentee_profile.jpg";
+                    chats
+                        // 유료 질문은 화면에 아예 렌더링하지 않음.
+                        .filter((chat) => chat.type !== 'paid')
+                        .map((chat) => {
+                            const isMentor = sessionData?.host?.userId && String(chat.senderId) === String(sessionData.host.userId);
+                            const profileImage = isMentor ? "/images/mentor_profile.jpg" : "/images/mentee_profile.jpg";
 
-                        return (
-                            <div key={chat.id} className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <img
-                                    src={profileImage}
-                                    alt={isMentor ? "멘토 프로필" : "멘티 프로필"}
-                                    className="w-9 h-9 rounded-full object-cover shrink-0 bg-gray-800 border-2 border-[#FFCC00]"
-                                />
+                            return (
+                                <div key={chat.id} className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <img
+                                        src={profileImage}
+                                        alt={isMentor ? "멘토 프로필" : "멘티 프로필"}
+                                        className="w-9 h-9 rounded-full object-cover shrink-0 bg-gray-800 border-2 border-[#FFCC00]"
+                                    />
 
-                                {/* 💡 넓이를 차지하도록 w-full 추가 */}
-                                <div className="flex flex-col items-start w-full">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-sm font-semibold text-gray-400">{chat.author}</span>
+                                    <div className="flex flex-col items-start w-full">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-sm font-semibold text-gray-400">{chat.author}</span>
+                                        </div>
                                         
-                                        {/* 기존 유료 질문 배지 */}
-                                        {chat.type === 'paid' && (
-                                            <span className="bg-[#FFCC00] text-[#1A1A1A] text-[10px] font-extrabold px-1.5 py-0.5 rounded tracking-wide">
-                                                유료 질문
-                                            </span>
-                                        )}
-                                        
-                                        {/* 💡 [추가] 일반 질문 배지 (유료가 아니면서 isQuestion이 true일 때) */}
-                                        {chat.isQuestion && chat.type !== 'paid' && (
-                                            <span className="bg-blue-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
-                                                💡 질문
-                                            </span>
-                                        )}
-                                    </div>
-                                    
-                                    {/* 💡 [수정] 질문 여부에 따른 말풍선 조건부 스타일링 */}
-                                    <div 
-                                        className={`text-[15px] break-all leading-relaxed ${
-                                            chat.type === 'paid' 
-                                                ? 'text-[#FFCC00]' // 유료 질문 텍스트 스타일
-                                                : chat.isQuestion 
-                                                    ? 'bg-blue-900/30 border border-blue-500/50 text-blue-50 px-3 py-2 rounded-2xl rounded-tl-sm w-fit max-w-[90%]' // 🎯 일반 질문 말풍선
-                                                    : 'text-gray-100' // 일반 채팅 텍스트 스타일
-                                        }`}
-                                    >
-                                        {chat.content}
+                                        <div className="text-[15px] break-all leading-relaxed text-gray-100">
+                                            {chat.content}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })
+                            );
+                        })
                 )}
                 <div ref={messagesEndRef} />
             </div>
