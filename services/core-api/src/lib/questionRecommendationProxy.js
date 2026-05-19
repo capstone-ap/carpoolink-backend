@@ -202,3 +202,32 @@ export async function requestQuestionRecommendations(payload, options = {}) {
 
     return responseBody;
 }
+
+export async function requestQuestionRanking(payload, options = {}) {
+    const baseUrl = options.baseUrl ?? getQuestionServiceUrl();
+    const fetchImpl = options.fetchImpl ?? fetch;
+    const response = await fetchImpl(`${baseUrl}/api/questions/rank-batch`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+
+    let responseBody = null;
+    try {
+        responseBody = await response.json();
+    } catch {
+        responseBody = null;
+    }
+
+    if (!response.ok) {
+        throw new QuestionRecommendationProxyError(
+            responseBody?.message ?? 'failed to rank questions',
+            response.status,
+            responseBody?.code ?? responseBody?.error ?? 'QUESTION_RANKING_SERVICE_FAILED',
+        );
+    }
+
+    return responseBody;
+}

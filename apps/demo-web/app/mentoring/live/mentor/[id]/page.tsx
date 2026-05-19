@@ -1,21 +1,23 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { io, Socket } from "socket.io-client";
+import { io } from "socket.io-client";
 import { PhoneOff, Users, Volume2, Settings, Mic, MicOff, Video, VideoOff, MessageSquare, Lock, AlertCircle } from "lucide-react";
 
+import apiClient from "@/lib/apiClient";
 import { useMentoringSession } from "@/hooks/useMentoringSession";
 import { useWebRtcSession } from "@/hooks/useWebRtcSession";
 
 interface Question {
-    id: number;
+    questionId: string;
     type: "free" | "paid";
     isPrivate: boolean;
     author: string;
-    avatar: string;
     content: string;
+    status: "BEFORE" | "ANSWERING" | "COMPLETED";
+    priorityScore?: number;
 }
 
 interface ChatMessage {
@@ -24,6 +26,18 @@ interface ChatMessage {
     author: string;
     senderId: string;
     content: string;
+}
+
+interface QuestionQueueResponseItem {
+    questionId: string | number;
+    isPaid: boolean;
+    isPrivate: boolean;
+    content: string;
+    status: Question["status"];
+    priorityScore?: number;
+    user?: {
+        nickname?: string | null;
+    };
 }
 
 export default function MentorLivePage() {
@@ -41,8 +55,10 @@ export default function MentorLivePage() {
     const [isExitPopupOpen, setIsExitPopupOpen] = useState(false);
     const [isReading, setIsReading] = useState(false);
     const [currentIdx, setCurrentIdx] = useState(0);
+    const [questionQueue, setQuestionQueue] = useState<Question[]>([]);
+    const [isQuestionQueueLoading, setIsQuestionQueueLoading] = useState(false);
+    const [questionQueueError, setQuestionQueueError] = useState<string | null>(null);
 
-    const [chatSocket, setChatSocket] = useState<Socket | null>(null);
     const [chats, setChats] = useState<ChatMessage[]>([]);
     const [onlineUserCount, setOnlineUserCount] = useState<number>(0);
 
@@ -58,12 +74,50 @@ export default function MentorLivePage() {
             mentoringType: "GROUP"
         });
 
-    const questionQueue: Question[] = [
-        { id: 1, type: "paid", isPrivate: true, author: "김세종", avatar: "👨‍💼", content: '"How do you negotiate equity in a Series B startup without losing the offer?"' },
-        { id: 2, type: "free", isPrivate: false, author: "이유진", avatar: "👩‍💼", content: '"Can you share some tips on building a tech portfolio from scratch?"' }
-    ];
+    const currentQuestion = questionQueue[currentIdx] ?? {
+        questionId: "",
+        type: "free" as const,
+        isPrivate: false,
+        author: isQuestionQueueLoading ? "로딩 중" : "대기 중",
+        content: questionQueueError ?? (isQuestionQueueLoading ? "질문 큐를 불러오는 중입니다." : "아직 대기 중인 질문이 없습니다."),
+        status: "BEFORE" as const,
+    };
+    const hasCurrentQuestion = Boolean(currentQuestion.questionId);
+    const currentQuestionInitial = currentQuestion.author.trim().charAt(0) || "?";
 
-    const currentQuestion = questionQueue[currentIdx];
+    const fetchQuestionQueue = useCallback(async () => {
+        if (!mentoringId) return;
+
+        try {
+            setIsQuestionQueueLoading(true);
+            setQuestionQueueError(null);
+
+            const response = await apiClient.get("/api/questions", {
+                params: {
+                    mentoringId,
+                    status: "BEFORE",
+                },
+            });
+
+            const mappedQuestions = ((response.data?.questions ?? []) as QuestionQueueResponseItem[]).map((question) => ({
+                questionId: String(question.questionId),
+                type: question.isPaid ? "paid" : "free",
+                isPrivate: Boolean(question.isPrivate),
+                author: question.user?.nickname ?? "익명 멘티",
+                content: question.content,
+                status: question.status,
+                priorityScore: question.priorityScore,
+            })) as Question[];
+
+            setQuestionQueue(mappedQuestions);
+            setCurrentIdx((prev) => Math.min(prev, Math.max(mappedQuestions.length - 1, 0)));
+        } catch (err) {
+            console.error("질문 큐 조회 실패:", err);
+            setQuestionQueueError("질문 큐를 불러오지 못했습니다.");
+        } finally {
+            setIsQuestionQueueLoading(false);
+        }
+    }, [mentoringId]);
 
     useEffect(() => {
         const storedRole = localStorage.getItem("role")?.toUpperCase();
@@ -117,19 +171,24 @@ export default function MentorLivePage() {
                 senderId: String(m.userId),
                 content: m.content.replace("[유료] ", ""),
             }]);
+            if (m.question) {
+                fetchQuestionQueue();
+            }
         });
 
         newSocket.on("user_joined", (data: any) => setOnlineUserCount(data.userCount));
         newSocket.on("user_left", (data: any) => setOnlineUserCount(data.userCount));
         newSocket.on("online_users", (data: any) => setOnlineUserCount(data.userCount));
 
-        setChatSocket(newSocket);
-
         return () => {
             newSocket.emit("leave_chat", { mentoringId, userId: String(userId), userName });
             newSocket.disconnect();
         };
-    }, [mentoringId, userId, userName]);
+    }, [fetchQuestionQueue, mentoringId, userId, userName]);
+
+    useEffect(() => {
+        fetchQuestionQueue();
+    }, [fetchQuestionQueue]);
 
     useEffect(() => {
         if (isChatOpen) {
@@ -145,8 +204,34 @@ export default function MentorLivePage() {
     }, [localStream, isCameraOn]);
 
     const handleNextQuestion = () => {
+        if (questionQueue.length === 0) return;
         setCurrentIdx((prev) => (prev + 1) % questionQueue.length);
         setIsReading(false);
+    };
+
+    const handleStartQuestion = async () => {
+        if (!currentQuestion.questionId) return;
+
+        try {
+            await apiClient.patch(`/api/questions/${currentQuestion.questionId}/answering`);
+            setIsReading(true);
+        } catch (err) {
+            console.error("질문 읽기 시작 실패:", err);
+            alert("질문 상태를 답변 중으로 변경하지 못했습니다.");
+        }
+    };
+
+    const handleCompleteQuestion = async () => {
+        if (!currentQuestion.questionId) return;
+
+        try {
+            await apiClient.patch(`/api/questions/${currentQuestion.questionId}/completed`);
+            setIsReading(false);
+            await fetchQuestionQueue();
+        } catch (err) {
+            console.error("질문 답변 완료 실패:", err);
+            alert("질문 답변 완료 처리에 실패했습니다.");
+        }
     };
 
     // 멘토링 세션 완전 종료 처리
@@ -218,8 +303,13 @@ export default function MentorLivePage() {
                         <div className="flex flex-col gap-3 flex-1">
                             <div className="flex items-center justify-between w-full">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 bg-black/10 rounded-full flex items-center justify-center text-sm">{currentQuestion.avatar}</div>
+                                    <div className="w-8 h-8 bg-black/10 rounded-full flex items-center justify-center text-sm">{currentQuestionInitial}</div>
                                     <span className="font-bold text-[14px]">{currentQuestion.author}</span>
+                                    {typeof currentQuestion.priorityScore === "number" && (
+                                        <span className="text-[10px] font-extrabold bg-black/10 px-2 py-1 rounded-lg">
+                                            우선순위 {currentQuestion.priorityScore.toFixed(1)}
+                                        </span>
+                                    )}
                                 </div>
                                 {currentQuestion.isPrivate && (
                                     <div className="flex items-center gap-1 bg-red-600 text-white text-[10px] font-extrabold px-2 py-1 rounded-lg">
@@ -230,11 +320,11 @@ export default function MentorLivePage() {
                             <p className="font-extrabold text-[16px] leading-snug">{currentQuestion.content}</p>
                         </div>
                         <div className="flex flex-col gap-2 shrink-0 justify-center">
-                            <button onClick={() => setIsReading(true)} className={`px-3 py-2.5 rounded-xl text-[12px] font-bold flex items-center justify-center transition-all ${isReading ? 'bg-red-500 text-white shadow-lg' : 'bg-[#1A1A1A] text-[#FFCC00]'}`}>
+                            <button disabled={!hasCurrentQuestion} onClick={handleStartQuestion} className={`px-3 py-2.5 rounded-xl text-[12px] font-bold flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${isReading ? 'bg-red-500 text-white shadow-lg' : 'bg-[#1A1A1A] text-[#FFCC00]'}`}>
                                 <Volume2 className={`w-3.5 h-3.5 mr-1.5 ${isReading ? 'animate-pulse' : ''}`} />
                                 {isReading ? '읽는 중...' : '질문 읽기'}
                             </button>
-                            <button onClick={handleNextQuestion} className="px-3 py-2.5 rounded-xl text-[12px] font-bold bg-[#E0E0E0] hover:bg-[#D0D0D0]">답변 완료</button>
+                            <button disabled={!hasCurrentQuestion} onClick={handleCompleteQuestion} className="px-3 py-2.5 rounded-xl text-[12px] font-bold bg-[#E0E0E0] hover:bg-[#D0D0D0] disabled:opacity-50 disabled:cursor-not-allowed">답변 완료</button>
                         </div>
                     </div>
 
@@ -256,11 +346,12 @@ export default function MentorLivePage() {
                         </div>
                         <div className="relative w-full flex items-center justify-between px-3 pb-3 gap-2 z-10">
                             <div className="flex gap-2">
-                                <button onClick={handleNextQuestion} className="bg-[#FFCC00] text-[#1A1A1A] text-[11px] font-bold px-3 py-2 rounded-full">다음 질문</button>
-                                <button onClick={handleNextQuestion} className="bg-[#FFCC00] text-[#1A1A1A] text-[11px] font-bold px-3 py-2 rounded-full">답변 완료</button>
+                                <button disabled={questionQueue.length === 0} onClick={handleNextQuestion} className="bg-[#FFCC00] text-[#1A1A1A] text-[11px] font-bold px-3 py-2 rounded-full disabled:opacity-50 disabled:cursor-not-allowed">다음 질문</button>
+                                <button disabled={!hasCurrentQuestion} onClick={handleCompleteQuestion} className="bg-[#FFCC00] text-[#1A1A1A] text-[11px] font-bold px-3 py-2 rounded-full disabled:opacity-50 disabled:cursor-not-allowed">답변 완료</button>
                                 <button
-                                    onClick={() => setIsReading(true)}
-                                    className="bg-[#FFCC00] text-[#1A1A1A] text-[11px] font-bold px-3 py-2 rounded-full text-center active:scale-95 transition-transform"
+                                    disabled={!hasCurrentQuestion}
+                                    onClick={handleStartQuestion}
+                                    className="bg-[#FFCC00] text-[#1A1A1A] text-[11px] font-bold px-3 py-2 rounded-full text-center active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     질문 다시 읽기
                                 </button>

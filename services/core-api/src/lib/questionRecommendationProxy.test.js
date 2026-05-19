@@ -5,6 +5,7 @@ import {
     parseSessionId,
     QuestionRecommendationProxyError,
     requestQuestionRecommendations,
+    requestQuestionRanking,
     selectMenteeParticipant,
 } from './questionRecommendationProxy.js';
 
@@ -168,4 +169,39 @@ test('propagates question-service errors', async () => {
             && error.status === 502
             && error.code === 'QUESTION_RECOMMENDATION_GENERATION_FAILED',
     );
+});
+
+test('forwards ranking request to question-service', async () => {
+    const calls = [];
+    const result = await requestQuestionRanking(
+        {
+            questions: [
+                { id: '1', text: 'What should I ask first?', isPaid: false },
+            ],
+        },
+        {
+            baseUrl: 'http://question-service',
+            fetchImpl: async (url, options) => {
+                calls.push({ url, options });
+                return {
+                    ok: true,
+                    json: async () => ({
+                        service: 'question-service',
+                        rankedQuestions: [
+                            { id: '1', priorityScore: 0.75 },
+                        ],
+                    }),
+                };
+            },
+        },
+    );
+
+    assert.equal(calls[0].url, 'http://question-service/api/questions/rank-batch');
+    assert.equal(calls[0].options.method, 'POST');
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+        questions: [
+            { id: '1', text: 'What should I ask first?', isPaid: false },
+        ],
+    });
+    assert.equal(result.rankedQuestions[0].priorityScore, 0.75);
 });

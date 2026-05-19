@@ -1,5 +1,7 @@
 import {
     saveChatMessage,
+    saveQuestionFromChatMessage,
+    rankQuestionQueueForMentoring,
     getMentoringStatus,
     verifyChatJoinAccess,
 } from '../database/chatRepository.js';
@@ -270,6 +272,22 @@ export async function handleConnection(socket, io) {
                 content,
             });
 
+            let questionResult = null;
+            try {
+                questionResult = await saveQuestionFromChatMessage(chatMessage);
+            } catch (error) {
+                console.error('[Question] Failed to detect/save chat question:', error);
+            }
+
+            let rankingResult = null;
+            if (questionResult?.saved) {
+                try {
+                    rankingResult = await rankQuestionQueueForMentoring(BigInt(state.mentoringId));
+                } catch (error) {
+                    console.error('[Question] Failed to rank question queue:', error);
+                }
+            }
+
             // 실시간 브로드캐스트
             io.to(roomName).emit('new_message', {
                 mentoringChatId: chatMessage.mentoringChatId.toString(),
@@ -278,6 +296,20 @@ export async function handleConnection(socket, io) {
                 userName: state.userName,
                 content,
                 createdAt: chatMessage.createdAt,
+                question: questionResult?.saved
+                    ? {
+                        questionId: questionResult.question.questionId.toString(),
+                        isPaid: questionResult.question.isPaid,
+                        isPrivate: questionResult.question.isPrivate,
+                        status: questionResult.question.status,
+                    }
+                    : null,
+                ranking: rankingResult
+                    ? {
+                        updatedCount: rankingResult.updatedCount,
+                        clustering: rankingResult.clustering ?? null,
+                    }
+                    : null,
             });
         } catch (error) {
             console.error('Error in send_message:', error);

@@ -21,6 +21,13 @@ interface ChatMessage {
     content: string;
 }
 
+interface AiRecommendation {
+    questionId?: string | number;
+    content: string;
+    score?: number;
+    reason?: string;
+}
+
 // ============================================================================
 // [Wrapper 컴포넌트] 로딩 화면 & 방 입장 기록(History) 생성 게이트웨이
 // ============================================================================
@@ -113,6 +120,9 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
     const [chatInput, setChatInput] = useState("");
     const [isAiOpen, setIsAiOpen] = useState(false);
     const [isAutoplayBlocked, setIsAutoplayBlocked] = useState(false);
+    const [aiRecommendations, setAiRecommendations] = useState<AiRecommendation[]>([]);
+    const [isAiRecommendationsLoading, setIsAiRecommendationsLoading] = useState(false);
+    const [aiRecommendationError, setAiRecommendationError] = useState<string | null>(null);
 
     const [chatSocket, setChatSocket] = useState<Socket | null>(null);
     const [chats, setChats] = useState<ChatMessage[]>([]);
@@ -207,6 +217,31 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chats]);
+
+    useEffect(() => {
+        if (!isAiOpen || !mentoringId) return;
+
+        const fetchAiRecommendations = async () => {
+            try {
+                setIsAiRecommendationsLoading(true);
+                setAiRecommendationError(null);
+
+                const response = await apiClient.post("/api/questions/recommendations", {
+                    sessionId: mentoringId,
+                    count: 3,
+                });
+
+                setAiRecommendations((response.data?.questions ?? []) as AiRecommendation[]);
+            } catch (err) {
+                console.error("AI 질문 추천 조회 실패:", err);
+                setAiRecommendationError("추천 질문을 불러오지 못했습니다.");
+            } finally {
+                setIsAiRecommendationsLoading(false);
+            }
+        };
+
+        fetchAiRecommendations();
+    }, [isAiOpen, mentoringId]);
 
     // 멘토가 라이브 멘토링을 종료하면 멘티 자동 이동
     useEffect(() => {
@@ -418,13 +453,21 @@ function LiveMentoringContent({ mentoringId, role, userId, userName }: { mentori
                             </button>
 
                             <div className={`w-full bg-[#222222] border border-gray-700/50 rounded-2xl shadow-lg transition-all duration-300 ease-in-out overflow-hidden flex flex-col ${isAiOpen ? "max-h-64 opacity-100 p-4 mb-3" : "max-h-0 opacity-0 p-0 m-0 border-transparent"}`}>
-                                <ul className="space-y-3">
-                                    {["1. 신입 개발자로서 가장 중요하게 생각하시는 역량이 무엇인가요?", "2. 향후 커리어 방향을 어떻게 잡아야 할까요?", "3. 이력서에서 보완해야 할 점이 있다면 무엇일까요?"].map((item, idx) => (
-                                        <li key={idx} onClick={() => handleSuggestionClick(item)} className="text-sm text-gray-300 hover:text-white cursor-pointer transition-colors line-clamp-1 p-2 rounded-lg hover:bg-gray-700/30 active:bg-gray-700/50">
-                                            {item}
-                                        </li>
-                                    ))}
-                                </ul>
+                                {isAiRecommendationsLoading ? (
+                                    <div className="text-sm text-gray-400 p-2">추천 질문을 불러오는 중입니다...</div>
+                                ) : aiRecommendationError ? (
+                                    <div className="text-sm text-red-300 p-2">{aiRecommendationError}</div>
+                                ) : aiRecommendations.length === 0 ? (
+                                    <div className="text-sm text-gray-400 p-2">아직 추천할 질문이 없습니다.</div>
+                                ) : (
+                                    <ul className="space-y-3">
+                                        {aiRecommendations.map((item, idx) => (
+                                            <li key={item.questionId ?? idx} onClick={() => handleSuggestionClick(item.content)} className="text-sm text-gray-300 hover:text-white cursor-pointer transition-colors line-clamp-1 p-2 rounded-lg hover:bg-gray-700/30 active:bg-gray-700/50">
+                                                {idx + 1}. {item.content}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
                         </>
                     )}
